@@ -20,7 +20,7 @@ const UserDatabaseTable = () => {
   const {
     data: users = [],
     isLoading,
-    isError,
+    isError, 
   } = useQuery({
     queryKey: ["users"],
     queryFn: fetchUsers,
@@ -124,8 +124,8 @@ const UserDatabaseTable = () => {
                   <tr key={user._id} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-gray-700">{user._id}</td>
                     <td className="p-3 text-gray-700">
-                      {personalInfo.given_name || "N/A"}{" "}
-                      {personalInfo.surname || ""}
+                      {personalInfo.given_name || personalInfo.firstName || "N/A"}{" "}
+                      {personalInfo.surname || personalInfo.lastName || ""}
                     </td>
                     <td className="p-3 text-gray-700">
                       {user.phone_number || "N/A"}

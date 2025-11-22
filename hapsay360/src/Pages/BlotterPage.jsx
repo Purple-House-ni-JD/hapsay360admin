@@ -1,4 +1,5 @@
 import React from "react";
+import { useState } from "react";
 import { Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
@@ -8,7 +9,7 @@ const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
 const fetchBlotters = async () => {
-  const response = await fetch(`${apiBaseUrl}blotter/`);
+  const response = await fetch(`${apiBaseUrl}blotters/getBlotters`);
   if (!response.ok) {
     throw new Error("Unable to fetch blotter reports");
   }
@@ -17,13 +18,32 @@ const fetchBlotters = async () => {
 };
 
 const BlotterTable = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
   const {
     data: blotters = [],
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["blotter"],
+    queryKey: ["blotters"],
     queryFn: fetchBlotters,
+  });
+
+  const filteredBlotters = blotters.filter((blotter) => {
+    const givenName = blotter?.user_id?.personal_info?.given_name || "";
+    const surname = blotter?.user_id?.personal_info?.surname || "";
+    const incidentType = blotter?.incident?.incident_type || "";
+    const status = blotter?.status || "";
+
+    const nameMatch = givenName?.toLowerCase().includes(searchQuery.toLowerCase()) 
+    || surname?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const typeMatch = typeFilter === "All" ? true : incidentType.toLowerCase() === typeFilter.toLowerCase()
+
+    const statusMatch = statusFilter === "All" ? true : status.toLowerCase() === statusFilter.toLowerCase() 
+
+    return nameMatch && typeMatch && statusMatch;
   });
 
   return (
@@ -42,21 +62,42 @@ const BlotterTable = () => {
             type="text"
             placeholder="Search by applicant name or ID..."
             className="bg-transparent w-full focus:outline-none text-gray-700"
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
         {/* Status Dropdown + Export Button */}
         <div className="flex items-center gap-4">
-          <select className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none">
-            <option>Status: All</option>
-            <option>NEW</option>
-            <option>PENDING</option>
-            <option>RESOLVED</option>
-          </select>
+          <form>
+            <label htmlFor="status">Status: </label>
+            <select id="status" className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none"
+              onChange={(e) => setStatusFilter(e.target.value)}>
+              <option>All</option>
+              <option>Pending</option>
+              <option>Under Review</option>
+              <option>Investigating</option>
+              <option>Resolved</option>
+              <option>Closed</option>
+            </select>
+          </form>
 
           <button className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg shadow font-medium">
             Export user list
           </button>
+        </div>
+
+        {/* Type Dropdown */}
+        <div className="flex items-center gap-4">
+          <form>
+            <label htmlFor="type">Type: </label>
+            <select id="type" className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none"
+              onChange={(e) => setTypeFilter(e.target.value)}>
+              <option>All</option>
+              <option>Theft</option>
+              <option>Robbery</option>
+              <option>Assault</option>
+            </select>
+          </form>
         </div>
       </div>
 
@@ -104,7 +145,7 @@ const BlotterTable = () => {
 
             {!isLoading &&
               !isError &&
-              blotters.map((item) => {
+              filteredBlotters.map((item) => {
                 // Badge colors from screenshot
                 const statusClass =
                   item.status === "NEW"
@@ -113,14 +154,18 @@ const BlotterTable = () => {
                     ? "bg-yellow-100 text-yellow-700"
                     : "bg-green-100 text-green-700";
 
+                  const reporter = item?.user_id?.personal_info ?? {given_name: "Unknown", surname: ""};
+                  const assignedOfficer = item?.assigned_officer ?? {first_name: "Unknown", last_name: ""};
+                  const incidentType = item?.incident?.incident_type ?? "Unknown";
+
                 return (
-                  <tr key={item.id} className="border-b hover:bg-gray-50">
+                  <tr key={item._id} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-purple-600 font-medium">
-                      {item.id}
+                      {item._id}
                     </td>
-                    <td className="p-3">{item.reporter}</td>
-                    <td className="p-3">{item.type}</td>
-                    <td className="p-3">{item.date_filed}</td>
+                    <td className="p-3">{reporter.given_name} {reporter.surname}</td>
+                    <td className="p-3">{incidentType}</td>
+                    <td className="p-3">{item.created_at}</td>
 
                     <td className="p-3">
                       <span
@@ -130,7 +175,7 @@ const BlotterTable = () => {
                       </span>
                     </td>
 
-                    <td className="p-3">{item.assigned_officer ?? "N/A"}</td>
+                    <td className="p-3">{assignedOfficer.first_name } {assignedOfficer.last_name }</td>
 
                     <td className="p-3">
                       <button className="text-purple-600 hover:underline">

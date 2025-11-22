@@ -35,6 +35,15 @@ const fetchClearances = async () => {
   return data?.data ?? [];
 };
 
+const fetchBlotters = async () => {
+  const response = await fetch(`${apiBaseUrl}blotters/getBlotters`);
+  if (!response.ok) {
+    throw new Error("Unable to fetch blotter reports");
+  }
+  const data = await response.json();
+  return data?.data ?? [];
+};
+
 
 const DashboardCards = () => {
   const {
@@ -54,6 +63,19 @@ const DashboardCards = () => {
     queryKey: ["clearances"],
     queryFn: fetchClearances,
   });
+
+  const {
+    data: blotters = [],
+    isLoading: isBlotterLoading,
+    isError: isBlotterError,
+  } = useQuery({
+    queryKey: ["blotters"],
+    queryFn: fetchBlotters,
+  });
+
+  const pendingBlottersCount = blotters.filter(
+    (blotter) => blotter.status.toLowerCase() === "pending"
+  ).length;
 
   const pendingClearancesCount = clearances.filter(
     (clearance) => clearance.status === "pending"
@@ -76,7 +98,9 @@ const DashboardCards = () => {
 
       <DashboardCard
       title={"New Blotter Incidents"}
-      value={5}
+      value={
+        isBlotterLoading ? "Loading..." : isBlotterError ? "Error" : pendingBlottersCount
+      }
       color={"#4338ca"}
       subtitle={"Awaiting Police Review"}>
       </DashboardCard>
