@@ -269,7 +269,7 @@ const AdminDashboard = () => {
             />
     
             <main className={`
-                    flex-1 min-h-screen overflow-y-auto bg-gray-100 p-10 
+                    flex-1 h-screen overflow-y-auto bg-gray-100 p-10 
                     transition-all duration-300 ease-in-out
                     ${isCollapsed ? 'ml-20' : 'ml-96'} 
                 `}
