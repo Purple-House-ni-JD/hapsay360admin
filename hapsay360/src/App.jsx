@@ -24,7 +24,6 @@ function App() {
         <Route path="/AnnouncementPage" element={<AnnouncementPage />} />
         <Route path="/UserDatabase" element={<UserDatabasePage />} />
         <Route path="/SOSRequestsPage" element={<SOSRequestsPage />} />
-        <Route path="/Stations" element={<StationsPage />} />
       </Routes>
     </Router>
   );
