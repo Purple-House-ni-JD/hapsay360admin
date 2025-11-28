@@ -39,13 +39,13 @@ const Sidebar = ({ activePage, isCollapsed, toggleCollapse }) => {
     {
       label: "Stations & Personnel",
       icon: <Users size={24} />,
-      path: "/Stations",
-      id: "stations",
+      path: "/StationsAndPersonnel",
+      id: "stations_personnel",
     },
     {
       label: "Manage Announcements",
       icon: <Bell size={24} />,
-      path: "/Announcements",
+      path: "/AnnouncementPage",
       id: "announcements",
     },
     {

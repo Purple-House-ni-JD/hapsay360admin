@@ -7,6 +7,8 @@ import UserDatabasePage from "./Pages/UserDatabasePage";
 import ClearancePage from "./Pages/ClearancePage";
 import BlotterPage from "./Pages/BlotterPage";
 import SOSRequestsPage from "./Pages/SOSRequestsPage";
+import StationsAndPersonnel from './Pages/StationsAndPersonnel'
+import AnnouncementPage from "./Pages/AnnouncementPage";
 
 function App() {
   return (
@@ -16,9 +18,11 @@ function App() {
         <Route path="/ForgotPassword" element={<ForgotPassword />} />
         <Route path="/CreateNewPassword" element={<CreateNewPassword />} />
         <Route path="/AdminDashboard" element={<AdminDashboard />} />
-        <Route path="/UserDatabase" element={<UserDatabasePage />} />
         <Route path="/ClearancePage" element={<ClearancePage />} />
         <Route path="/BlotterPage" element={<BlotterPage />} />
+        <Route path="/StationsAndPersonnel" element={<StationsAndPersonnel />} />
+        <Route path="/AnnouncementPage" element={<AnnouncementPage />} />
+        <Route path="/UserDatabase" element={<UserDatabasePage />} />
         <Route path="/SOSRequestsPage" element={<SOSRequestsPage />} />
       </Routes>
     </Router>
