@@ -103,7 +103,7 @@ const StationsAndPersonnel = () => {
 
     const queryClient = useQueryClient();
     
-    const { data: stations = [], isLoading: stationsLoading } = useQuery({
+    const { data: stations = [] } = useQuery({
         queryKey: ["stations"],
         queryFn: fetchStations,
     });
