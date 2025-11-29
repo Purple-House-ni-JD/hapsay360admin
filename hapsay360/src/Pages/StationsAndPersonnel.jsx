@@ -4,6 +4,7 @@ import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
 import AddPersonnelModal from "../Components/AddPersonnelModal";
 import AddStationModal from "../Components/AddStationModal";
+import EditStationModal from "../Components/EditStationModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
@@ -63,7 +64,7 @@ const OfficerDatabaseTable = () => {
   );
 };
 
-const StationDatabaseTable = () => {
+const StationDatabaseTable = ({ onEditStation }) => {
   const { data: stations = [], isLoading } = useQuery({
     queryKey: ["stations"],
     queryFn: fetchStations,
@@ -90,6 +91,14 @@ const StationDatabaseTable = () => {
               <td className="px-6 py-4">{station.address}</td>
               <td className="px-6 py-4">{station.contact?.phone_number || 'N/A'}</td>
               <td className="px-6 py-4">{station.contact?.email || 'N/A'}</td>
+              <td className="px-6 py-4">
+                <button
+                  onClick={() => onEditStation(station)}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Edit
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -107,6 +116,7 @@ const StationsAndPersonnel = () => {
         queryKey: ["stations"],
         queryFn: fetchStations,
     });
+    
     const [isCollapsed, setIsCollapsed] = useState(() => {
         const saved = localStorage.getItem('sidebarCollapsed');
         return saved ? JSON.parse(saved) : false;
@@ -114,9 +124,11 @@ const StationsAndPersonnel = () => {
 
     const [currentView, setCurrentView] = useState('personnel');    
     
-    // 1. New State for Modals
+    // State for Modals
     const [isAddPersonnelModalOpen, setIsAddPersonnelModalOpen] = useState(false);
-    const [isAddStationModalOpen, setIsAddStationModalOpen] = useState(false); // State for the station modal from your image
+    const [isAddStationModalOpen, setIsAddStationModalOpen] = useState(false);
+    const [isEditStationModalOpen, setIsEditStationModalOpen] = useState(false);
+    const [selectedStation, setSelectedStation] = useState(null);
 
     const toggleCollapse = () => {
         setIsCollapsed(prev => {
@@ -124,6 +136,18 @@ const StationsAndPersonnel = () => {
             localStorage.setItem('sidebarCollapsed', JSON.stringify(newValue));
             return newValue;
         });
+    };
+
+    // Handler to open edit station modal
+    const handleEditStation = (station) => {
+        setSelectedStation(station);
+        setIsEditStationModalOpen(true);
+    };
+
+    // Handler to close edit station modal
+    const handleCloseEditStation = () => {
+        setIsEditStationModalOpen(false);
+        setSelectedStation(null);
     };
 
     const currentTitle = currentView === 'personnel' ? 'Personnel' : 'Stations';
@@ -142,7 +166,7 @@ const StationsAndPersonnel = () => {
                     ${isCollapsed ? 'ml-20' : 'ml-96'}
                 `}
                 >
-                    {/* Header: ... (same as before) */}
+                    {/* Header */}
                     <div className="sticky -top-10 -bottom-10 pt-4 bg-gray-100 z-20 pb-4 w-full">
                         <AdminHeader 
                             title={`Stations & Personnel / ${currentTitle}`} 
@@ -154,7 +178,7 @@ const StationsAndPersonnel = () => {
                         {/* Search, Filter, and Action Platform */}
                         <div className="bg-white p-8 rounded-xl shadow-lg mb-8">
                             
-                            {/* View Toggler - ... (same as before) */}
+                            {/* View Toggler */}
                             <div className="flex justify-start mb-6 gap-4">
                                 <button
                                     onClick={() => setCurrentView('personnel')}
@@ -181,7 +205,7 @@ const StationsAndPersonnel = () => {
                             {/* Search Bar and Actions Container */}
                             <div className="flex justify-between items-center flex-wrap gap-4"> 
                                 
-                                {/* Search Bar (Left Side) - ... (same as before) */}
+                                {/* Search Bar (Left Side) */}
                                 <div className="flex items-center bg-gray-100 rounded-lg px-4 py-2 w-full max-w-sm shadow-lg hover:shadow-2xl transition-shadow">
                                     <Search size={20} className="text-gray-600 mr-3" />
                                     <input
@@ -194,23 +218,23 @@ const StationsAndPersonnel = () => {
                                 {/* Action Buttons (Right Side) */}
                                 <div className="flex items-center gap-4 flex-wrap">
                                     
-                                    {/* Add Personnel Button -> OPEN MODAL */}
+                                    {/* Add Personnel Button */}
                                     <button 
-                                        onClick={() => setIsAddPersonnelModalOpen(true)} // 3. Open personnel modal
+                                        onClick={() => setIsAddPersonnelModalOpen(true)}
                                         className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-3 rounded-lg font-medium shadow-md hover:shadow-lg transition-shadow whitespace-nowrap"
                                     >
                                         <UserPlus size={18} /> Add Personnel
                                     </button>
                                     
-                                    {/* Add Station Button -> OPEN MODAL */}
+                                    {/* Add Station Button */}
                                     <button 
-                                        onClick={() => setIsAddStationModalOpen(true)} // Open station modal
+                                        onClick={() => setIsAddStationModalOpen(true)}
                                         className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg font-medium shadow-md hover:shadow-lg transition-shadow whitespace-nowrap"
                                     >
                                         <Home size={18} /> Add Station
                                     </button>
 
-                                    {/* Export Button - ... (same as before) */}
+                                    {/* Export Button */}
                                     <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-5 py-3 rounded-lg font-medium shadow-md hover:shadow-lg transition-shadow whitespace-nowrap">
                                         <Download size={18} /> Export PDF
                                     </button>
@@ -219,13 +243,13 @@ const StationsAndPersonnel = () => {
                             
                         </div>
 
-                        {/* Dynamic Table Rendering - ... (same as before) */}
+                        {/* Dynamic Table Rendering */}
                         <div className="bg-white p-8 rounded-xl shadow-lg">
-                        {currentView === 'personnel' ? (
-                            <OfficerDatabaseTable />
-                        ) : (
-                            <StationDatabaseTable />
-                        )}
+                            {currentView === 'personnel' ? (
+                                <OfficerDatabaseTable />
+                            ) : (
+                                <StationDatabaseTable onEditStation={handleEditStation} />
+                            )}
                         </div>
                         
                     </div>
@@ -237,10 +261,9 @@ const StationsAndPersonnel = () => {
             <AddPersonnelModal 
                 isOpen={isAddPersonnelModalOpen} 
                 onClose={() => setIsAddPersonnelModalOpen(false)} 
-                stations={stations} // 2. Pass stations data to the modal
+                stations={stations}
             />
             
-            {/* The modal from your image */}
             <AddStationModal 
                 isOpen={isAddStationModalOpen} 
                 onClose={() => setIsAddStationModalOpen(false)}
@@ -248,6 +271,14 @@ const StationsAndPersonnel = () => {
                     queryClient.invalidateQueries(['stations']);
                 }}
             />
+
+            {/* Edit Station Modal */}
+            {selectedStation && isEditStationModalOpen && (
+                <EditStationModal
+                    station={selectedStation}
+                    onClose={handleCloseEditStation}
+                />
+            )}
         </>
     );
 };
