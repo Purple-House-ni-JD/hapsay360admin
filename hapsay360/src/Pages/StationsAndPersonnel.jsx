@@ -5,13 +5,14 @@ import AdminHeader from "../Components/AdminHeader";
 import AddPersonnelModal from "../Components/AddPersonnelModal";
 import AddStationModal from "../Components/AddStationModal";
 import EditStationModal from "../Components/EditStationModal";
+import EditPersonnelModal from "../Components/EditPersonnelModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
 const fetchOfficers = async () => {
-  const response = await fetch(`${apiBaseUrl}officers/`);
+  const response = await fetch(`${apiBaseUrl}officers`);
   if (!response.ok) {
     throw new Error("Unable to fetch officers");
   }
@@ -28,7 +29,7 @@ const fetchStations = async () => {
   return data?.data ?? [];
 };
 
-const OfficerDatabaseTable = () => {
+const OfficerDatabaseTable = ({ onEditOfficer }) => {
   const { data: officers = [], isLoading } = useQuery({
     queryKey: ["officers"],
     queryFn: fetchOfficers,
@@ -44,18 +45,41 @@ const OfficerDatabaseTable = () => {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Badge Number</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Station</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
           {officers.map((officer) => (
             <tr key={officer._id}>
               <td className="px-6 py-4">{officer.first_name} {officer.last_name}</td>
-              <td className="px-6 py-4">{officer.rank}</td>
+              <td className="px-6 py-4">{officer.rank || 'N/A'}</td>
               <td className="px-6 py-4">{officer.badge_number || 'N/A'}</td>
+              <td className="px-6 py-4">
+                {officer.station_id?.name || 'Unassigned'}
+              </td>
               <td className="px-6 py-4">{officer.email}</td>
-              <td className="px-6 py-4">{officer.status}</td>
+              <td className="px-6 py-4">{officer.contact?.mobile_number || 'N/A'}</td>
+              <td className="px-6 py-4">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  officer.status === 'active' 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {officer.status}
+                </span>
+              </td>
+              <td className="px-6 py-4">
+                <button
+                  onClick={() => onEditOfficer(officer)}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Edit
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -128,7 +152,9 @@ const StationsAndPersonnel = () => {
     const [isAddPersonnelModalOpen, setIsAddPersonnelModalOpen] = useState(false);
     const [isAddStationModalOpen, setIsAddStationModalOpen] = useState(false);
     const [isEditStationModalOpen, setIsEditStationModalOpen] = useState(false);
+    const [isEditPersonnelModalOpen, setIsEditPersonnelModalOpen] = useState(false);
     const [selectedStation, setSelectedStation] = useState(null);
+    const [selectedOfficer, setSelectedOfficer] = useState(null);
 
     const toggleCollapse = () => {
         setIsCollapsed(prev => {
@@ -148,6 +174,18 @@ const StationsAndPersonnel = () => {
     const handleCloseEditStation = () => {
         setIsEditStationModalOpen(false);
         setSelectedStation(null);
+    };
+
+    // Handler to open edit personnel modal
+    const handleEditOfficer = (officer) => {
+        setSelectedOfficer(officer);
+        setIsEditPersonnelModalOpen(true);
+    };
+
+    // Handler to close edit personnel modal
+    const handleCloseEditOfficer = () => {
+        setIsEditPersonnelModalOpen(false);
+        setSelectedOfficer(null);
     };
 
     const currentTitle = currentView === 'personnel' ? 'Personnel' : 'Stations';
@@ -246,7 +284,7 @@ const StationsAndPersonnel = () => {
                         {/* Dynamic Table Rendering */}
                         <div className="bg-white p-8 rounded-xl shadow-lg">
                             {currentView === 'personnel' ? (
-                                <OfficerDatabaseTable />
+                                <OfficerDatabaseTable onEditOfficer={handleEditOfficer} />
                             ) : (
                                 <StationDatabaseTable onEditStation={handleEditStation} />
                             )}
@@ -277,6 +315,15 @@ const StationsAndPersonnel = () => {
                 <EditStationModal
                     station={selectedStation}
                     onClose={handleCloseEditStation}
+                />
+            )}
+
+            {/* Edit Personnel Modal */}
+            {selectedOfficer && isEditPersonnelModalOpen && (
+                <EditPersonnelModal
+                    officer={selectedOfficer}
+                    stations={stations}
+                    onClose={handleCloseEditOfficer}
                 />
             )}
         </>

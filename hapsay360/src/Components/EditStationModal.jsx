@@ -5,13 +5,11 @@ import React from "react";
 const Modal = ({ onClose, maxWidth, children }) => {
     return (
         <div 
-            className="fixed inset-0 **bg-black bg-opacity-90** backdrop-blur-sm flex justify-center items-center z-50"
-            // Add an onClick handler to close the modal when clicking the backdrop
+            className="fixed inset-0 bg-opacity-80 backdrop-blur-sm flex justify-center items-center z-50"
             onClick={onClose} 
         >
             <div 
                 className={`relative ${maxWidth || 'max-w-2xl'} w-full mx-4`}
-                // Stop click events from propagating from the modal content to the backdrop
                 onClick={(e) => e.stopPropagation()} 
             >
                 {children}
@@ -25,6 +23,7 @@ const EditStationModal = ({ station, onClose }) => {
     const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
     const queryClient = useQueryClient();
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const [form, setForm] = useState({
         name: station.name || "",
@@ -59,13 +58,34 @@ const EditStationModal = ({ station, onClose }) => {
         return data;
     };
 
-    const { mutate, isLoading, isError, isSuccess, error } = useMutation({
+    const deleteStation = async () => {
+        const response = await fetch(`${apiBaseUrl}stations/${station._id}`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error(`Server error. Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || data.error || "Unable to delete station.");
+        }
+        
+        return data;
+    };
+
+    const updateMutation = useMutation({
         mutationFn: updateStation,
         onSuccess: (data) => {
             console.log("Station updated successfully", data);
             alert("Station updated successfully!");
             queryClient.invalidateQueries(["stations"]);
-            // Optionally close modal after successful update
             setTimeout(() => {
                 onClose();
             }, 1500);
@@ -73,6 +93,20 @@ const EditStationModal = ({ station, onClose }) => {
         onError: (error) => {
             console.error("Error updating station:", error);
             alert(error.message || "Unable to update station.");
+        }
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteStation,
+        onSuccess: (data) => {
+            console.log("Station deleted successfully", data);
+            alert("Station deleted successfully!");
+            queryClient.invalidateQueries(["stations"]);
+            onClose();
+        },
+        onError: (error) => {
+            console.error("Error deleting station:", error);
+            alert(error.message || "Unable to delete station.");
         }
     });
 
@@ -86,107 +120,80 @@ const EditStationModal = ({ station, onClose }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        mutate(form);
+        updateMutation.mutate(form);
+    };
+
+    const handleDelete = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = () => {
+        deleteMutation.mutate();
+        setShowDeleteConfirm(false);
+    };
+
+    const cancelDelete = () => {
+        setShowDeleteConfirm(false);
     };
 
     const inner = (
         <div className="relative w-full max-w-lg bg-white rounded-lg shadow-lg overflow-hidden">
             <div className="p-6">
-                {isSuccess && (
+                {updateMutation.isSuccess && (
                     <div className="mb-3 rounded-md bg-green-50 border border-green-100 text-green-700 px-3 py-2">
                         Updated successfully.
                     </div>
                 )}
 
-                {isError && (
+                {updateMutation.isError && (
                     <div className="mb-3 rounded-md bg-red-50 border border-red-100 text-red-700 px-3 py-2">
-                        {(error && error.message) || 'Unable to update station.'}
+                        {(updateMutation.error && updateMutation.error.message) || 'Unable to update station.'}
                     </div>
                 )}
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Station Name
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Station Name"
-                            name="name"
-                            value={form.name}
-                            onChange={handleChange}
-                            className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                        />
+                {deleteMutation.isError && (
+                    <div className="mb-3 rounded-md bg-red-50 border border-red-100 text-red-700 px-3 py-2">
+                        {(deleteMutation.error && deleteMutation.error.message) || 'Unable to delete station.'}
                     </div>
+                )}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Address
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Address"
-                            name="address"
-                            value={form.address}
-                            onChange={handleChange}
-                            className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Phone Number
-                            </label>
-                            <input
-                                type="tel"
-                                placeholder="Phone Number"
-                                name="phone_number"
-                                value={form.phone_number}
-                                onChange={handleChange}
-                                className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Landline
-                            </label>
-                            <input
-                                type="tel"
-                                placeholder="Landline"
-                                name="landline"
-                                value={form.landline}
-                                onChange={handleChange}
-                                className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                            />
+                {showDeleteConfirm ? (
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                            Confirm Deletion
+                        </h3>
+                        <p className="text-gray-600">
+                            Are you sure you want to delete "{station.name}"? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={confirmDelete}
+                                disabled={deleteMutation.isLoading}
+                                className="flex-1 bg-red-600 text-white py-2 rounded-md hover:bg-red-700 disabled:opacity-60"
+                            >
+                                {deleteMutation.isLoading ? 'Deleting...' : 'Yes, Delete'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelDelete}
+                                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            placeholder="Email"
-                            name="email"
-                            value={form.email}
-                            onChange={handleChange}
-                            className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ) : (
+                    <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Latitude
+                                Station Name
                             </label>
                             <input
                                 type="text"
-                                placeholder="Latitude"
-                                name="latitude"
-                                value={form.latitude}
+                                placeholder="Station Name"
+                                name="name"
+                                value={form.name}
                                 onChange={handleChange}
                                 className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                             />
@@ -194,38 +201,120 @@ const EditStationModal = ({ station, onClose }) => {
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Longitude
+                                Address
                             </label>
                             <input
                                 type="text"
-                                placeholder="Longitude"
-                                name="longitude"
-                                value={form.longitude}
+                                placeholder="Address"
+                                name="address"
+                                value={form.address}
                                 onChange={handleChange}
                                 className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                             />
                         </div>
-                    </div>
 
-                    <div className="flex gap-3 pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Phone Number
+                                </label>
+                                <input
+                                    type="tel"
+                                    placeholder="Phone Number"
+                                    name="phone_number"
+                                    value={form.phone_number}
+                                    onChange={handleChange}
+                                    className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Landline
+                                </label>
+                                <input
+                                    type="tel"
+                                    placeholder="Landline"
+                                    name="landline"
+                                    value={form.landline}
+                                    onChange={handleChange}
+                                    className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Email
+                            </label>
+                            <input
+                                type="email"
+                                placeholder="Email"
+                                name="email"
+                                value={form.email}
+                                onChange={handleChange}
+                                className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Latitude
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Latitude"
+                                    name="latitude"
+                                    value={form.latitude}
+                                    onChange={handleChange}
+                                    className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Longitude
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Longitude"
+                                    name="longitude"
+                                    value={form.longitude}
+                                    onChange={handleChange}
+                                    className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={handleSubmit}
+                                disabled={updateMutation.isLoading}
+                                className="flex-1 bg-yellow-500 text-white py-2 rounded-md hover:bg-yellow-600 disabled:opacity-60"
+                            >
+                                {updateMutation.isLoading ? 'Saving...' : 'Update Station'}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => onClose && onClose()}
+                                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+
                         <button
                             type="button"
-                            onClick={handleSubmit}
-                            disabled={isLoading}
-                            className="flex-1 bg-yellow-500 text-white py-2 rounded-md hover:bg-yellow-600 disabled:opacity-60"
+                            onClick={handleDelete}
+                            className="w-full bg-red-600 text-white py-2 rounded-md hover:bg-red-700 mt-2"
                         >
-                            {isLoading ? 'Saving...' : 'Update Station'}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => onClose && onClose()}
-                            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300"
-                        >
-                            Cancel
+                            Delete Station
                         </button>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

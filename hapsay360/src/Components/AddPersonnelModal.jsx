@@ -33,7 +33,7 @@ const AddPersonnelModal = ({ isOpen, onClose, stations = [] }) => {
 
   return (
     // Modal Overlay: Changed bg-opacity-50 to bg-opacity-20 for greater transparency
-    <div className="fixed inset-0 bg-white bg-opacity-70 flex justify-center items-center z-50">
+    <div className="fixed inset-0 bg-opacity-80 backdrop-blur-sm flex justify-center items-center z-50">
       {/* Modal Content (White box in the center) */}
       <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transform transition-all duration-300 scale-100 opacity-100">
         
