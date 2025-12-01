@@ -19,19 +19,27 @@ const BlotterTable = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
 
-  const { data: blotters = [], isLoading, isError } = useQuery({
+  const {
+    data: blotters = [],
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["blotters"],
     queryFn: fetchBlotters,
   });
 
   const filteredBlotters = blotters.filter((b) => {
-    const name = `${b?.user_id?.personal_info?.given_name ?? ""} ${b?.user_id?.personal_info?.surname ?? ""}`.toLowerCase();
+    const name = `${b?.user_id?.personal_info?.given_name ?? ""} ${
+      b?.user_id?.personal_info?.surname ?? ""
+    }`.toLowerCase();
     const type = (b?.incident?.incident_type ?? "").toLowerCase();
     const status = (b?.status ?? "").toLowerCase();
 
-    return name.includes(searchQuery.toLowerCase()) &&
-           (typeFilter === "All" || type === typeFilter.toLowerCase()) &&
-           (statusFilter === "All" || status === statusFilter.toLowerCase());
+    return (
+      name.includes(searchQuery.toLowerCase()) &&
+      (typeFilter === "All" || type === typeFilter.toLowerCase()) &&
+      (statusFilter === "All" || status === statusFilter.toLowerCase())
+    );
   });
 
   return (
@@ -96,52 +104,78 @@ const BlotterTable = () => {
               <th className="p-3 text-gray-600 font-semibold">TYPE</th>
               <th className="p-3 text-gray-600 font-semibold">DATE FILED</th>
               <th className="p-3 text-gray-600 font-semibold">STATUS</th>
-              <th className="p-3 text-gray-600 font-semibold">ASSIGNED OFFICER</th>
+              <th className="p-3 text-gray-600 font-semibold">
+                ASSIGNED OFFICER
+              </th>
               <th className="p-3 text-gray-600 font-semibold">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan="7" className="p-3 text-center text-gray-600">Loading blotter reports…</td>
+                <td colSpan="7" className="p-3 text-center text-gray-600">
+                  Loading blotter reports…
+                </td>
               </tr>
             )}
             {isError && (
               <tr>
-                <td colSpan="7" className="p-3 text-center text-red-600">Unable to load reports.</td>
+                <td colSpan="7" className="p-3 text-center text-red-600">
+                  Unable to load reports.
+                </td>
               </tr>
             )}
             {!isLoading && !isError && filteredBlotters.length === 0 && (
               <tr>
-                <td colSpan="7" className="p-3 text-center text-gray-700">No records found.</td>
+                <td colSpan="7" className="p-3 text-center text-gray-700">
+                  No records found.
+                </td>
               </tr>
             )}
-            {!isLoading && !isError && filteredBlotters.map((item) => {
-              const statusClass =
-                item.status === "NEW" ? "bg-red-100 text-red-600" :
-                item.status === "PENDING" ? "bg-yellow-100 text-yellow-700" :
-                "bg-green-100 text-green-700";
-              const reporter = `${item?.user_id?.personal_info?.given_name ?? ""} ${item?.user_id?.personal_info?.surname ?? ""}`.trim() || "Unknown";
-              const officer = `${item?.assigned_officer?.first_name ?? ""} ${item?.assigned_officer?.last_name ?? ""}`.trim() || "Unassigned";
-              const type = item?.incident?.incident_type ?? "Unknown";
-              return (
-                <tr key={item._id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 text-purple-600 font-medium">{item._id}</td>
-                  <td className="p-3">{reporter}</td>
-                  <td className="p-3">{type}</td>
-                  <td className="p-3">{item.created_at}</td>
-                  <td className="p-3">
-                    <span className={`${statusClass} px-3 py-1 text-sm font-semibold rounded-full`}>{item.status}</span>
-                  </td>
-                  <td className="p-3">{officer}</td>
-                  <td className="p-3">
-                    <button className="text-purple-600 hover:underline">
-                      {item.status === "NEW" ? "Assign & View" : "Update Status"}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+            {!isLoading &&
+              !isError &&
+              filteredBlotters.map((item) => {
+                const statusClass =
+                  item.status === "NEW"
+                    ? "bg-red-100 text-red-600"
+                    : item.status === "PENDING"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-green-100 text-green-700";
+                const reporter =
+                  `${item?.user_id?.personal_info?.given_name ?? ""} ${
+                    item?.user_id?.personal_info?.surname ?? ""
+                  }`.trim() || "Unknown";
+                const officer =
+                  `${item?.assigned_Officer?.first_name ?? ""} ${
+                    item?.assigned_Officer?.last_name ?? ""
+                  }`.trim() || "Unassigned";
+                const type = item?.incident?.incident_type ?? "Unknown";
+                return (
+                  <tr key={item._id} className="border-b hover:bg-gray-50">
+                    <td className="p-3 text-purple-600 font-medium">
+                      {item._id}
+                    </td>
+                    <td className="p-3">{reporter}</td>
+                    <td className="p-3">{type}</td>
+                    <td className="p-3">{item.created_at}</td>
+                    <td className="p-3">
+                      <span
+                        className={`${statusClass} px-3 py-1 text-sm font-semibold rounded-full`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="p-3">{officer}</td>
+                    <td className="p-3">
+                      <button className="text-purple-600 hover:underline">
+                        {item.status === "NEW"
+                          ? "Assign & View"
+                          : "Update Status"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
@@ -151,15 +185,15 @@ const BlotterTable = () => {
 
 const BlotterPage = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsed');
+    const saved = localStorage.getItem("sidebarCollapsed");
     return saved ? JSON.parse(saved) : false;
-  }); 
-  
+  });
+
   const toggleCollapse = () => {
-    setIsCollapsed(prev => {
-        const newValue = !prev;
-        localStorage.setItem('sidebarCollapsed', JSON.stringify(newValue));
-        return newValue;
+    setIsCollapsed((prev) => {
+      const newValue = !prev;
+      localStorage.setItem("sidebarCollapsed", JSON.stringify(newValue));
+      return newValue;
     });
   };
 
@@ -171,20 +205,23 @@ const BlotterPage = () => {
           isCollapsed={isCollapsed}
           toggleCollapse={toggleCollapse}
         />
-        <main className={`
+        <main
+          className={`
                   flex-1 h-screen overflow-y-auto bg-gray-100 p-10 
                   transition-all duration-300 
-                  ${isCollapsed ? 'ml-20' : 'ml-96'}
+                  ${isCollapsed ? "ml-20" : "ml-96"}
               `}
         >
           <div className="sticky -top-10 -bottom-10 pt-4 bg-gray-100 z-20 pb-4 **w-full**">
-            <AdminHeader title="Blotter Incident Reports" username="Admin User" />
+            <AdminHeader
+              title="Blotter Incident Reports"
+              username="Admin User"
+            />
           </div>
 
           <div className="pt-10">
             <BlotterTable />
           </div>
-          
         </main>
       </div>
     </>
