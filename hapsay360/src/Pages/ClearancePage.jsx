@@ -8,7 +8,7 @@ const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
 const fetchClearances = async () => {
-  const response = await fetch(`${apiBaseUrl}clearances/`);
+  const response = await fetch(`${apiBaseUrl}clearance/getClearances`);
   if (!response.ok) {
     throw new Error("Unable to fetch clearances");
   }
@@ -106,42 +106,46 @@ const ClearanceTable = () => {
             {!isLoading &&
               !isError &&
               clearances.map((item) => {
+                const paymentStatus = item.payment?.status;
                 const paymentClass =
-                  item.payment_status === "Success"
+                  paymentStatus === "paid"
                     ? "bg-green-100 text-green-700"
                     : "bg-red-100 text-red-700";
                 const clearanceClass =
-                  item.clearance_status === "APPROVED"
+                  item.status === "APPROVED" || item.status === "confirmed"
                     ? "bg-green-100 text-green-700"
-                    : item.clearance_status === "PENDING"
+                    : item.status === "PENDING"
                     ? "bg-yellow-100 text-yellow-700"
                     : "bg-red-100 text-red-700";
+                
 
+                const applicant = item.user_id?.personal_info ??{ given_name: "Unknown", surname: "" };
+                const status = item.status || "pending";
                 return (
                   <tr key={item.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-purple-600 font-medium">
-                      {item.id}
+                      {item.custom_id}
                     </td>
-                    <td className="p-3">{item.applicant}</td>
+                    <td className="p-3">{`${applicant.given_name} ${applicant.surname}`}</td>
                     <td className="p-3">{item.purpose}</td>
-                    <td className="p-3">{item.date_applied}</td>
+                    <td className="p-3">{item.created_at}</td>
                     <td className="p-3">
                       <span
                         className={`${paymentClass} px-2 py-1 rounded-full text-sm font-semibold`}
                       >
-                        {item.payment_status}
+                        {paymentStatus ? paymentStatus : "pending"}
                       </span>
                     </td>
                     <td className="p-3">
                       <span
                         className={`${clearanceClass} px-2 py-1 rounded-full text-sm font-semibold`}
                       >
-                        {item.clearance_status}
+                        {status ? status === 'confirmed' ? 'APPROVED' : "Waiting for Review" : "N/A"}
                       </span>
                     </td>
                     <td className="p-3">
                       <button className="text-purple-600 hover:underline">
-                        {item.clearance_status === "APPROVED"
+                        {status === "APPROVED"
                           ? "View/Print"
                           : "Review"}
                       </button>

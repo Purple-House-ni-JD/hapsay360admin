@@ -1,11 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { X, Home, Send, MapPin, Loader2, AlertTriangle } from "lucide-react";
+import { X, Home, Send, MapPin, Loader2, AlertTriangle, CheckCircle } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
-// --- Configuration ---
-// Assuming your API is running on http://localhost:3000 as per the console error
-const apiBaseUrl = "http://localhost:3000/api/"; 
 
 // Fix Leaflet marker icons OUTSIDE component - runs once when module loads
 delete L.Icon.Default.prototype._getIconUrl;
@@ -16,27 +13,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
-
-// --- API Function ---
-const createStation = async (data) => {
-    // Backend Route: /api/stations/create
-    const response = await fetch(`${apiBaseUrl}stations/create`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-        // Throw an error with the message from the backend (e.g., "All fields are required")
-        const errorMessage = responseData.error || responseData.message || "Failed to add station.";
-        throw new Error(errorMessage);
-    }
-    return responseData;
-};
 
 // --- OpenStreetMap Picker Component ---
 const GoogleMapPicker = ({ initialPosition, onLocationSelect }) => {
@@ -103,177 +79,188 @@ const GoogleMapPicker = ({ initialPosition, onLocationSelect }) => {
 };
 
 // --- AddStationModal Component ---
-const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
+const AddStationModal = ({ isOpen, onClose }) => {
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
+
+  const queryClient = useQueryClient();
+
+  const [isAddStationSuccess, setIsAddStationSuccess] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     address: "",
-    phone_number: "", 
+    phone_number: "",
     email: "",
     landline: "",
-    location: null, 
+    latitude: "",
+    longitude: "",
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null); // State for displaying frontend validation/backend errors
+  const [error, setError] = useState(null);
+
+  // API function using the correct endpoint
+  const addStation = async (payload) => {
+    const response = await fetch(`${apiBaseUrl}police-stations/create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = data.message || "Unable to add station.";
+      throw new Error(errorMessage);
+    }
+    return data;
+  };
+
+  const { mutate, isLoading: isSubmitting, isError, error: mutationError } = useMutation({
+    mutationFn: addStation,
+    onSuccess: (data) => {
+      console.log("Station added successfully", data);
+      queryClient.invalidateQueries({ queryKey: ["stations"] });
+      setIsAddStationSuccess(true);
+      // Reset form
+      setFormData({
+        name: "",
+        address: "",
+        phone_number: "",
+        email: "",
+        landline: "",
+        latitude: "",
+        longitude: "",
+      });
+      setError(null);
+      
+    },
+    onError: (err) => {
+      console.error("Error adding station", err);
+      setError(err.message);
+    },
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Handle the field name change: 'phoneNumber' is now 'phone_number'
-    setFormData((prev) => ({ 
-        ...prev, 
-        [name === 'phoneNumber' ? 'phone_number' : name]: value 
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
     }));
   };
 
   const handleLocationSelect = useCallback((location) => {
     setFormData((prev) => ({
       ...prev,
-      location: {
-        latitude: location.lat,
-        longitude: location.lng,
-      },
+      latitude: location.lat,
+      longitude: location.lng,
     }));
   }, []);
 
-  const showMessage = (title, message, isError) => {
-    const modal = document.getElementById("message-box");
-    if (modal) {
-      const bgColor = isError ? "bg-red-100" : "bg-green-100";
-      const textColor = isError ? "text-red-600" : "text-green-600";
-      const buttonColor = isError ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600";
-      const icon = isError ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 mr-2 text-red-500"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>` : '';
-      
-      modal.innerHTML = `
-        <div class="fixed inset-0 ${bgColor} bg-opacity-70 flex justify-center items-center z-[60]">
-          <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h4 class="font-bold ${textColor} flex items-center">${icon}${title}</h4>
-            <p class="mt-2">${message}</p>
-            <button onclick="document.getElementById('message-box').innerHTML = ''" class="mt-4 ${buttonColor} text-white p-2 rounded-lg">Close</button>
-          </div>
-        </div>
-      `;
-    }
-  };
-
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null); 
+    setError(null);
 
-    // --- Frontend Validation based on Backend Controller requirements ---
+    // Frontend Validation
     const requiredFields = {
-        name: formData.name,
-        address: formData.address,
-        phone_number: formData.phone_number,
-        landline: formData.landline,
-        location: formData.location,
+      name: formData.name,
+      address: formData.address,
+      phone_number: formData.phone_number,
+      landline: formData.landline,
+      latitude: formData.latitude,
+      longitude: formData.longitude,
     };
 
-    const missingFields = Object.keys(requiredFields).filter(key => 
-        !requiredFields[key] || (typeof requiredFields[key] === 'string' && requiredFields[key].trim() === '')
+    const missingFields = Object.keys(requiredFields).filter(
+      (key) =>
+        !requiredFields[key] ||
+        (typeof requiredFields[key] === "string" &&
+          requiredFields[key].trim() === "")
     );
 
     if (missingFields.length > 0) {
-        const fieldNames = missingFields.map(key => {
-            if (key === 'phone_number') return 'Phone Number';
-            if (key === 'landline') return 'Landline';
-            if (key === 'location') return 'Location Pin on Map';
-            return key.charAt(0).toUpperCase() + key.slice(1);
-        }).join(', ');
+      const fieldNames = missingFields
+        .map((key) => {
+          if (key === "phone_number") return "Phone Number";
+          if (key === "landline") return "Landline";
+          if (key === "latitude" || key === "longitude")
+            return "Location Pin on Map";
+          return key.charAt(0).toUpperCase() + key.slice(1);
+        })
+        .join(", ");
 
-        const errorMsg = `Missing required fields: ${fieldNames}`;
-        setError(errorMsg);
-        showMessage("Validation Error", errorMsg, true);
-        return;
+      const errorMsg = `Missing required fields: ${fieldNames}`;
+      setError(errorMsg);
+      return;
     }
-    // --- End Validation ---
 
-    setIsSubmitting(true);
-
-    try {
-        const stationData = {
-            name: formData.name,
-            address: formData.address,
-            
-            // Backend expects flattened contact fields
-            phone_number: formData.phone_number,
-            email: formData.email,
-            landline: formData.landline,
-            
-            // Backend expects flattened location fields (latitude, longitude)
-            latitude: formData.location.latitude,
-            longitude: formData.location.longitude,
-        };
-
-        const result = await createStation(stationData);
-
-        if (onStationAdded) onStationAdded();
-
-        showMessage("Success!", `Station "${result.data.name}" added successfully!`, false);
-
-        // Reset form data
-        setFormData({
-            name: "",
-            address: "",
-            phone_number: "",
-            email: "",
-            landline: "",
-            location: null,
-        });
-
-        onClose();
-    } catch (err) {
-        console.error("Error adding station:", err);
-        const errorMessage = err.message.startsWith('Failed to fetch') 
-            ? "Connection Refused: Ensure the backend server is running." 
-            : err.message;
-        
-        setError(errorMessage);
-        showMessage("Error", errorMessage, true);
-    } finally {
-        setIsSubmitting(false);
-    }
+    // Submit the form
+    mutate(formData);
   };
 
-  const displayLatitude = formData.location?.latitude || "N/A";
-  const displayLongitude = formData.location?.longitude || "N/A";
+  const handleClose = () => {
+    setIsAddStationSuccess(false);
+    onClose();
+  }
 
-  const initialMapPosition = formData.location
-    ? {
-        lat: parseFloat(formData.location.latitude),
-        lng: parseFloat(formData.location.longitude),
-      }
-    : null;
+  const displayLatitude = formData.latitude || "N/A";
+  const displayLongitude = formData.longitude || "N/A";
+
+  const initialMapPosition =
+    formData.latitude && formData.longitude
+      ? {
+          lat: parseFloat(formData.latitude),
+          lng: parseFloat(formData.longitude),
+        }
+      : null;
 
   // Return null AFTER all hooks have been called
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
-      <div id="message-box"></div>
-
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-full max-h-full transform transition-all duration-300 scale-100 opacity-100 flex flex-col p-4 sm:p-8">
         <div className="flex justify-between items-center mb-6 border-b pb-4 shrink-0">
           <h3 className="text-3xl font-extrabold text-yellow-700 flex items-center gap-2">
             <Home size={28} className="text-yellow-500" /> Add New Station
           </h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors"
             type="button"
+            disabled={isSubmitting}
           >
             <X size={24} />
           </button>
         </div>
 
-        {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
-                <AlertTriangle size={20} />
-                <span className="font-medium">{error}</span>
+        {/* Success Message */}
+        {isAddStationSuccess && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+            <CheckCircle className="text-green-500" size={20} />
+            <div>
+              <p className="text-green-800 font-medium">
+                Station added successfully!
+              </p>
             </div>
+          </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-grow min-h-0">
+        {/* Error Message */}
+        {(error || isError) && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
+            <AlertTriangle size={20} />
+            <span className="font-medium">
+              {error || mutationError?.message || "Unable to add station"}
+            </span>
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col flex-grow min-h-0"
+        >
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 flex-grow min-h-0">
             <div className="space-y-5 overflow-y-auto pr-2">
               <h4 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-3">
@@ -282,8 +269,11 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
 
               {/* Name (Required) */}
               <div>
-                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-1">
-                  Station Name
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-semibold text-gray-700 mb-1"
+                >
+                  Station Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -299,8 +289,11 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
 
               {/* Address (Required) */}
               <div>
-                <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-1">
-                  Address
+                <label
+                  htmlFor="address"
+                  className="block text-sm font-semibold text-gray-700 mb-1"
+                >
+                  Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -315,15 +308,18 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Phone Number (Required) - Renamed to phone_number in state, using 'phoneNumber' for input name for backward compatibility with handleChange logic if needed, but 'phone_number' is cleaner*/}
+                {/* Phone Number (Required) */}
                 <div>
-                  <label htmlFor="phone_number" className="block text-sm font-semibold text-gray-700 mb-1">
+                  <label
+                    htmlFor="phone_number"
+                    className="block text-sm font-semibold text-gray-700 mb-1"
+                  >
                     Phone Number (Mobile) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
                     id="phone_number"
-                    name="phone_number" // Changed name to match state key
+                    name="phone_number"
                     value={formData.phone_number}
                     onChange={handleChange}
                     placeholder="09123456789"
@@ -331,10 +327,13 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
                     className="w-full border border-gray-300 rounded-lg p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150 shadow-sm"
                   />
                 </div>
-                
+
                 {/* Landline (Required) */}
                 <div>
-                  <label htmlFor="landline" className="block text-sm font-semibold text-gray-700 mb-1">
+                  <label
+                    htmlFor="landline"
+                    className="block text-sm font-semibold text-gray-700 mb-1"
+                  >
                     Landline <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -350,9 +349,12 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
                 </div>
               </div>
 
-              {/* Email (Optional in Backend, but keeping 'required' if you want it) */}
+              {/* Email (Optional) */}
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-semibold text-gray-700 mb-1"
+                >
                   Email
                 </label>
                 <input
@@ -362,7 +364,6 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="station@example.com"
-                  // required // Removed 'required' here as it's optional in the backend model
                   className="w-full border border-gray-300 rounded-lg p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150 shadow-sm"
                 />
               </div>
@@ -395,7 +396,8 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
 
               <div className="flex-grow min-h-96">
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                  <MapPin size={18} className="text-yellow-500" /> Select Station Location <span className="text-red-500">*</span>
+                  <MapPin size={18} className="text-yellow-500" /> Select
+                  Station Location <span className="text-red-500">*</span>
                 </label>
                 <div className="border border-gray-300 rounded-lg overflow-hidden shadow-md w-full h-full">
                   <GoogleMapPicker
@@ -410,7 +412,7 @@ const AddStationModal = ({ isOpen, onClose, onStationAdded }) => {
           <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-gray-200 shrink-0">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-100 transition-colors shadow-sm"
               disabled={isSubmitting}
             >
