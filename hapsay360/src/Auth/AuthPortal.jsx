@@ -3,13 +3,21 @@ import { Mail, Lock, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function AuthPortal() {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5173/api";
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
   const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
   const initialFormState = {
     first_name: "",
     last_name: "",
     email: "",
     password: "",
+  };
+
+  const navigate = useNavigate();
+
+  const capitalizeString = (s = "") => {
+    const str = String(s).trim();
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   };
 
   async function login(payload) {
@@ -59,7 +67,6 @@ export default function AuthPortal() {
   // }
 
   const [isLogin, setIsLogin] = useState(true);
-  const navigate = useNavigate();
   const [formData, setFormData] = useState(initialFormState);
 
   const handleChange = (e) => {
@@ -81,8 +88,8 @@ export default function AuthPortal() {
     }
 
     await signup({
-      first_name: formData.first_name.trim(),
-      last_name: formData.last_name.trim(),
+      first_name: capitalizeString(formData.first_name),
+      last_name: capitalizeString(formData.last_name),
       email: formData.email.trim(),
       password: formData.password,
     });
