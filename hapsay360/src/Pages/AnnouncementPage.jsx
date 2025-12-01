@@ -40,7 +40,7 @@ const AnnouncementTable = () => {
     <div>
       {/* Title and welcome */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
-        <h2 className="text-3xl font-bold">Announcement Management</h2>
+        <h2 className="text-3xl font-bold">Public Announcements Management</h2>
         <button className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg font-medium shadow-lg hover:shadow-2xl transition-shadow mt-4 md:mt-0">
           <Plus size={18} /> Create Announcement
         </button>
@@ -187,7 +187,7 @@ const AnnouncementPage = () => {
       >
         {/* ---- sticky header ---- */}
         <div className="sticky -top-10 z-20 bg-gray-100 pt-4 pb-4">
-          <AdminHeader title="Announcements" username="Admin User" />
+          <AdminHeader title="Manage Announcements" username="Admin User" />
         </div>
 
         <AnnouncementTable />
