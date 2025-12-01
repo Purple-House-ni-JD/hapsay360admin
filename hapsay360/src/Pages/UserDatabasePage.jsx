@@ -3,27 +3,28 @@ import { Search, Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
+import UserModal from "../Components/UserModal"; // Make sure this path is correct
 
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
-
-// Fetch All Users. Commented by Steve
+// Fetch All Users
 const fetchUsers = async () => {
   const response = await fetch(`${apiBaseUrl}users/`);
-  if (!response.ok) {
-    throw new Error("Unable to fetch users");
-  }
+  if (!response.ok) throw new Error("Unable to fetch users");
   const data = await response.json();
   return data?.data ?? [];
 };
 
 // User Database Table
 const UserDatabaseTable = () => {
+  // ✅ Move useState inside the component
+  const [selectedUser, setSelectedUser] = React.useState(null);
+
   const {
     data: users = [],
     isLoading,
-    isError, 
+    isError,
   } = useQuery({
     queryKey: ["users"],
     queryFn: fetchUsers,
@@ -31,6 +32,11 @@ const UserDatabaseTable = () => {
 
   return (
     <div>
+      {/* Modal */}
+      {selectedUser && (
+        <UserModal user={selectedUser} onClose={() => setSelectedUser(null)} />
+      )}
+
       {/* Title */}
       <h2 className="text-3xl font-bold mb-6">Registered User Database</h2>
 
@@ -70,6 +76,9 @@ const UserDatabaseTable = () => {
               </th>
               <th className="p-3 text-left text-gray-600 font-semibold">
                 NAME
+              </th>
+              <th className="p-3 text-left text-gray-600 font-semibold">
+                ROLE
               </th>
               <th className="p-3 text-left text-gray-600 font-semibold">
                 CONTACT
@@ -122,14 +131,31 @@ const UserDatabaseTable = () => {
                 };
                 const statusClass =
                   statusStyleMap[status] ?? "bg-gray-100 text-gray-600";
+                const roleStyleMap = {
+                  admin: "bg-red-100 text-red-700",
+                  officer: "bg-yellow-100 text-yellow-700",
+                  user: "bg-green-100 text-green-700",
+                };
+                const roleClass =
+                  roleStyleMap[user.role] || "bg-gray-100 text-gray-600";
 
                 return (
                   <tr key={user._id} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-gray-700">{user._id}</td>
                     <td className="p-3 text-gray-700">
-                      {personalInfo.given_name || personalInfo.firstName || "N/A"}{" "}
+                      {personalInfo.given_name ||
+                        personalInfo.firstName ||
+                        "N/A"}{" "}
                       {personalInfo.surname || personalInfo.lastName || ""}
                     </td>
+                    <td className="p-3">
+                      <span
+                        className={`${roleClass} px-3 py-1 rounded-full text-sm font-semibold`}
+                      >
+                        {user.role || "user"}
+                      </span>
+                    </td>
+
                     <td className="p-3 text-gray-700">
                       {user.phone_number || "N/A"}
                     </td>
@@ -149,7 +175,10 @@ const UserDatabaseTable = () => {
                       {user.last_activity || "N/A"}
                     </td>
                     <td className="p-3 text-gray-700">
-                      <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg font-medium shadow-md hover:shadow-lg transition-shadow">
+                      <button
+                        onClick={() => setSelectedUser(user)}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg shadow-md"
+                      >
                         View
                       </button>
                     </td>
@@ -163,45 +192,42 @@ const UserDatabaseTable = () => {
   );
 };
 
+// Page Component
 const UserDatabasePage = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsed');
+    const saved = localStorage.getItem("sidebarCollapsed");
     return saved ? JSON.parse(saved) : false;
-  }); 
-    
+  });
+
   const toggleCollapse = () => {
-    setIsCollapsed(prev => {
+    setIsCollapsed((prev) => {
       const newValue = !prev;
-      localStorage.setItem('sidebarCollapsed', JSON.stringify(newValue));
+      localStorage.setItem("sidebarCollapsed", JSON.stringify(newValue));
       return newValue;
     });
   };
 
   return (
-    <>
-      <div className="flex">
-        <Sidebar
-          activePage="users"
-          isCollapsed={isCollapsed}
-          toggleCollapse={toggleCollapse}
-        />
-        <main className={`
-                  flex-1 h-screen overflow-y-auto bg-gray-100 p-10 
-                  transition-all duration-300 
-                  ${isCollapsed ? 'ml-20' : 'ml-96'}
-              `}
-        >
-          <div className="sticky -top-10 -bottom-10 pt-4 bg-gray-100 z-20 pb-4 **w-full**">
-            <AdminHeader title="Registered Users" username="Admin User" />
-          </div>
+    <div className="flex">
+      <Sidebar
+        activePage="users"
+        isCollapsed={isCollapsed}
+        toggleCollapse={toggleCollapse}
+      />
+      <main
+        className={`flex-1 h-screen overflow-y-auto bg-gray-100 p-10 transition-all duration-300 ${
+          isCollapsed ? "ml-20" : "ml-96"
+        }`}
+      >
+        <div className="sticky -top-10 -bottom-10 pt-4 bg-gray-100 z-20 pb-4 w-full">
+          <AdminHeader title="Registered Users" username="Admin User" />
+        </div>
 
-          <div className="pt-10">
-            <UserDatabaseTable />
-          </div>
-          
-        </main>
-      </div>
-    </>
+        <div className="pt-10">
+          <UserDatabaseTable />
+        </div>
+      </main>
+    </div>
   );
 };
 
