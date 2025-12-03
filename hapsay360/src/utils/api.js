@@ -87,6 +87,66 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
+  
+  // File upload helper
+  uploadFile: async (endpoint, file, options = {}) => {
+    const token = getToken();
+    const cleanEndpoint = endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
+    const url = `${apiBaseUrl}${cleanEndpoint}`;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+      ...options,
+    });
+    
+    if (response.status === 401) {
+      localStorage.removeItem("token");
+      throw new Error("Unauthorized: Please login again");
+    }
+    
+    return response;
+  },
+  
+  // Multiple files upload helper
+  uploadFiles: async (endpoint, files, options = {}) => {
+    const token = getToken();
+    const cleanEndpoint = endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
+    const url = `${apiBaseUrl}${cleanEndpoint}`;
+    
+    const formData = new FormData();
+    Array.from(files).forEach((file) => {
+      formData.append("files", file);
+    });
+    
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+      ...options,
+    });
+    
+    if (response.status === 401) {
+      localStorage.removeItem("token");
+      throw new Error("Unauthorized: Please login again");
+    }
+    
+    return response;
+  },
 };
 
 export default api;
