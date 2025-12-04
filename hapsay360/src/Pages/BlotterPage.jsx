@@ -1,40 +1,45 @@
 import React, { useState } from "react";
-import { Search, UserPlus, RefreshCw } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Search, UserPlus, RefreshCw, Trash, Eye, Pencil } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
 import ActionButton from "../Components/ActionButton";
+
+// Optional: if you have separate modals for view/edit
+import ViewBlotterModal from "../Components/ViewBlotterModal";
+import EditBlotterModal from "../Components/EditBlotterModal";
 
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
 const fetchBlotters = async () => {
   const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-  
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
+  if (!token) throw new Error("No authentication token found");
 
   const response = await fetch(`${apiBaseUrl}blotters/getBlotters`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || "Unable to fetch blotter reports");
   }
-  
+
   const data = await response.json();
   return data?.data ?? [];
 };
 
 const BlotterTable = () => {
+  const queryClient = useQueryClient();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
+
+  // For Modals
+  const [selectedBlotter, setSelectedBlotter] = useState(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const { data: blotters = [], isLoading, isError, error } = useQuery({
     queryKey: ["blotters"],
@@ -51,6 +56,29 @@ const BlotterTable = () => {
            (typeFilter === "All" || type === typeFilter.toLowerCase()) &&
            (statusFilter === "All" || status === statusFilter.toLowerCase());
   });
+
+  // Delete Blotter
+  const deleteBlotter = async (id) => {
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    const response = await fetch(`${apiBaseUrl}blotters/delete/${id}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to delete blotter");
+    return data;
+  };
+
+  const { mutate: mutateDeleteBlotter } = useMutation({
+    mutationFn: deleteBlotter,
+    onSuccess: () => queryClient.invalidateQueries(["blotters"]),
+  });
+
+  const handleDeleteBlotter = (id) => {
+    if (window.confirm("Are you sure you want to delete this blotter?")) {
+      mutateDeleteBlotter(id);
+    }
+  };
 
   return (
     <>
@@ -171,12 +199,29 @@ const BlotterTable = () => {
                   </td>
                   <td className="p-3">{officer}</td>
                   <td className="p-3">
-                    <ActionButton
-                      label={!item.assigned_Officer ? "Assign & View" : "Update Status"}
-                      icon={!item.assigned_Officer ? UserPlus : RefreshCw}
-                      variant={!item.assigned_Officer ? "warning" : "accent"}
-                      onClick={() => console.log("Action for blotter:", item._id)}
-                    />
+                    <div className="flex gap-2">
+                      <ActionButton
+                        label="View"
+                        icon={Eye}
+                        variant="info"
+                        size="sm"
+                        onClick={() => { setSelectedBlotter(item); setIsViewOpen(true); }}
+                      />
+                      <ActionButton
+                        label="Edit"
+                        icon={Pencil}
+                        variant="accent"
+                        size="sm"
+                        onClick={() => { setSelectedBlotter(item); setIsEditOpen(true); }}
+                      />
+                      <ActionButton
+                        label="Delete"
+                        icon={Trash}
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDeleteBlotter(item._id)}
+                      />
+                    </div>
                   </td>
                 </tr>
               );
@@ -184,6 +229,22 @@ const BlotterTable = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Modals */}
+      {isViewOpen && selectedBlotter && (
+        <ViewBlotterModal
+          isOpen={isViewOpen}
+          onClose={() => setIsViewOpen(false)}
+          blotter={selectedBlotter}
+        />
+      )}
+      {isEditOpen && selectedBlotter && (
+        <EditBlotterModal
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          blotter={selectedBlotter}
+        />
+      )}
     </>
   );
 };
