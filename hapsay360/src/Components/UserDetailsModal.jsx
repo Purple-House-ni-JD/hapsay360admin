@@ -71,30 +71,34 @@ const UserDetailsModal = ({ isOpen, onClose, userId }) => {
 
   // Update form data when user data is loaded
   useEffect(() => {
-    if (user) {
+    const updateUserForm = () => {
       setFormData({
-        given_name: user.personal_info?.given_name || "",
-        middle_name: user.personal_info?.middle_name || "",
-        surname: user.personal_info?.surname || "",
-        qualifier: user.personal_info?.qualifier || "",
-        sex: user.personal_info?.sex || "",
-        civil_status: user.personal_info?.civil_status || "",
-        birthday: user.personal_info?.birthday
+        given_name: user?.personal_info?.given_name || "",
+        middle_name: user?.personal_info?.middle_name || "",
+        surname: user?.personal_info?.surname || "",
+        qualifier: user?.personal_info?.qualifier || "",
+        sex: user?.personal_info?.sex || "",
+        civil_status: user?.personal_info?.civil_status || "",
+        birthday: user?.personal_info?.birthday
           ? new Date(user.personal_info.birthday).toISOString().split("T")[0]
           : "",
-        pwd: user.personal_info?.pwd || false,
-        nationality: user.personal_info?.nationality || "",
-        phone_number: user.phone_number || "",
-        email: user.email || "",
-        status: user.status || "Active",
-        house_no: user.address?.house_no || "",
-        street: user.address?.street || "",
-        barangay: user.address?.barangay || "",
-        city: user.address?.city || "",
-        postal_code: user.address?.postal_code || "",
-        province: user.address?.province || "",
-        country: user.address?.country || "",
+        pwd: user?.personal_info?.pwd || false,
+        nationality: user?.personal_info?.nationality || "",
+        phone_number: user?.phone_number || "",
+        email: user?.email || "",
+        status: user?.status || "Active",
+        house_no: user?.address?.house_no || "",
+        street: user?.address?.street || "",
+        barangay: user?.address?.barangay || "",
+        city: user?.address?.city || "",
+        postal_code: user?.address?.postal_code || "",
+        province: user?.address?.province || "",
+        country: user?.address?.country || "",
       });
+    };
+
+    if (user) {
+      updateUserForm();
     }
   }, [user]);
 
