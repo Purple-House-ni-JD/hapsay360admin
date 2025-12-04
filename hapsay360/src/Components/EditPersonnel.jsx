@@ -2,11 +2,9 @@ import {useState} from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React from "react";
 import Modal from "./Modal";
+import api from "../utils/api";
 
 const EditPersonnel = ({officer, onClose, stations}) => {
-    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-    const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
-
     const queryClient = useQueryClient();
 
     const [form, setForm] = useState({
@@ -20,13 +18,8 @@ const EditPersonnel = ({officer, onClose, stations}) => {
     });
     
     const updateOfficer = async (payload) => {
-        const response = await fetch(`${apiBaseUrl}officers/update/${officer._id}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
+        // Use shared api util so Authorization header (token) is included
+        const response = await api.put(`officers/update/${officer._id}`, payload);
         const data = await response.json();
         console.log(data);
         if (response.ok) {
