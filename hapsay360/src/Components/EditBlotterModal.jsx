@@ -20,11 +20,12 @@ const EditBlotterModal = ({ isOpen, onClose, blotter, officers }) => {
     return data;
   };
 
-  const { mutate, isLoading, isError, isSuccess, error } = useMutation({
+  const { mutate, isLoading, isError, error } = useMutation({
     mutationFn: updateBlotter,
     onSuccess: () => {
       queryClient.invalidateQueries(['blotters']);
       alert('Blotter updated successfully!');
+      onClose();
     },
     onError: (err) => {
       alert(err.message || 'Failed to update blotter');
@@ -39,7 +40,6 @@ const EditBlotterModal = ({ isOpen, onClose, blotter, officers }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     mutate(form);
-    onClose();
   };
 
   return (
@@ -47,12 +47,6 @@ const EditBlotterModal = ({ isOpen, onClose, blotter, officers }) => {
       <div className="relative w-full bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="p-6">
           <h2 className="text-xl font-semibold mb-4">Edit Blotter</h2>
-
-          {isSuccess && (
-            <div className="mb-3 rounded-md bg-green-50 border border-green-100 text-green-700 px-3 py-2">
-              Updated successfully!
-            </div>
-          )}
 
           {isError && (
             <div className="mb-3 rounded-md bg-red-50 border border-red-100 text-red-700 px-3 py-2">
@@ -101,6 +95,7 @@ const EditBlotterModal = ({ isOpen, onClose, blotter, officers }) => {
                 value={form.notes}
                 onChange={handleChange}
                 placeholder="Enter any notes..."
+                rows={4}
                 className="w-full border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -109,7 +104,7 @@ const EditBlotterModal = ({ isOpen, onClose, blotter, officers }) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 disabled:opacity-60"
+                className="flex-1 bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 disabled:opacity-60 transition-colors"
               >
                 {isLoading ? 'Saving...' : 'Save Changes'}
               </button>
@@ -117,7 +112,7 @@ const EditBlotterModal = ({ isOpen, onClose, blotter, officers }) => {
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300"
+                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md hover:bg-gray-300 transition-colors"
               >
                 Cancel
               </button>
