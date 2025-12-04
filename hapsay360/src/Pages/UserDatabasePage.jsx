@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useQuery} from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
 import UserDetailsModal from "../Components/UserDetailsModal";

@@ -1,24 +1,22 @@
 import React, { useState } from "react";
-import { Search, MapPin, FileText } from "lucide-react";
+import { Search, MapPin, Eye } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
 import ActionButton from "../Components/ActionButton";
+import SOSDetailsModal from "../Components/SOSDetailsModal";
 
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
-// Fetch All SOS Requests
 const fetchSOS = async () => {
-  const response = await fetch(`${apiBaseUrl}sos-requests/`);
-  if (!response.ok) {
-    throw new Error("Unable to fetch SOS requests");
-  }
+  const response = await fetch(`${apiBaseUrl}sos/`);
+  if (!response.ok) throw new Error("Unable to fetch SOS requests");
   const data = await response.json();
   return data?.data ?? [];
 };
 
-const SOSRequestsTable = () => {
+const SOSRequestsTable = ({ openModal }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
@@ -29,18 +27,24 @@ const SOSRequestsTable = () => {
   } = useQuery({
     queryKey: ["sosRequests"],
     queryFn: fetchSOS,
+    refetchInterval: 10000,
   });
 
   const filteredData = sosRequests.filter((item) => {
     const matchesSearch =
-      item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.caller.toLowerCase().includes(searchTerm.toLowerCase());
+      item.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.caller?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === "All" ? true : item.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
+
+  const openInGoogleMaps = (lat, lng) => {
+    const url = `https://www.google.com/maps?q=${lat},${lng}`;
+    window.open(url, "_blank");
+  };
 
   return (
     <div>
@@ -71,11 +75,16 @@ const SOSRequestsTable = () => {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="All">Status: All</option>
+            <option value="PENDING">Pending</option>
             <option value="ACTIVE">Active</option>
+            <option value="RESPONDING">Responding</option>
             <option value="RESOLVED">Resolved</option>
           </select>
 
-          <p className="text-red-600 font-semibold">LIVE Feed</p>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
+            <p className="text-red-600 font-semibold">LIVE Feed</p>
+          </div>
         </div>
       </div>
 
@@ -125,8 +134,12 @@ const SOSRequestsTable = () => {
               !isError &&
               filteredData.map((item) => {
                 const statusBadge =
-                  item.status === "ACTIVE"
+                  item.status === "PENDING"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : item.status === "ACTIVE"
                     ? "bg-red-100 text-red-700"
+                    : item.status === "RESPONDING"
+                    ? "bg-blue-100 text-blue-700"
                     : "bg-green-100 text-green-700";
 
                 return (
@@ -135,9 +148,11 @@ const SOSRequestsTable = () => {
                       {item.id}
                     </td>
                     <td className="p-3">{item.caller}</td>
-                    <td className="p-3">{item.timestamp}</td>
                     <td className="p-3">
-                      {item.lat}, {item.lng}
+                      {new Date(item.timestamp).toLocaleString()}
+                    </td>
+                    <td className="p-3 text-sm">
+                      {item.lat?.toFixed(4)}, {item.lng?.toFixed(4)}
                     </td>
                     <td className="p-3">
                       <span
@@ -149,20 +164,17 @@ const SOSRequestsTable = () => {
                     <td className="p-3">{item.responder}</td>
                     <td className="p-3 flex flex-wrap gap-2">
                       <ActionButton
+                        label="View Details"
+                        icon={Eye}
+                        variant="info"
+                        onClick={() => openModal(item._id || item.id)}
+                      />
+                      <ActionButton
                         label="View Map"
                         icon={MapPin}
                         variant="success"
-                        onClick={() => {}}
+                        onClick={() => openInGoogleMaps(item.lat, item.lng)}
                       />
-
-                      {item.status === "RESOLVED" && (
-                        <ActionButton
-                          label="View Report"
-                          icon={FileText}
-                          variant="info"
-                          onClick={() => {}}
-                        />
-                      )}
                     </td>
                   </tr>
                 );
@@ -176,18 +188,31 @@ const SOSRequestsTable = () => {
 
 const SOSRequestsPage = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsed');
+    const saved = localStorage.getItem("sidebarCollapsed");
     return saved ? JSON.parse(saved) : false;
-  }); 
-      
+  });
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSOSId, setSelectedSOSId] = useState(null);
+
   const toggleCollapse = () => {
-    setIsCollapsed(prev => {
+    setIsCollapsed((prev) => {
       const newValue = !prev;
-        localStorage.setItem('sidebarCollapsed', JSON.stringify(newValue));
-        return newValue;
+      localStorage.setItem("sidebarCollapsed", JSON.stringify(newValue));
+      return newValue;
     });
   };
-  
+
+  const openModal = (sosId) => {
+    setSelectedSOSId(sosId);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedSOSId(null);
+  };
+
   return (
     <div className="flex">
       <Sidebar
@@ -197,19 +222,23 @@ const SOSRequestsPage = () => {
       />
 
       <main
-        className={`
-          flex-1 h-screen overflow-y-auto bg-gray-100 p-10
-          transition-all duration-300 ease-in-out
-          ${isCollapsed ? 'ml-20' : 'ml-96'}
-        `}
+        className={`flex-1 h-screen overflow-y-auto bg-gray-100 p-10 transition-all duration-300 ease-in-out ${
+          isCollapsed ? "ml-20" : "ml-96"
+        }`}
       >
-        {/* ---- sticky header ---- */}
         <div className="sticky -top-10 z-20 bg-gray-100 pt-4 pb-4">
           <AdminHeader title="SOS Requests" username="Admin User" />
         </div>
 
-        <SOSRequestsTable />
+        <SOSRequestsTable openModal={openModal} />
       </main>
+
+      {/* Modal rendered outside the scrollable main */}
+      <SOSDetailsModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        sosId={selectedSOSId}
+      />
     </div>
   );
 };
