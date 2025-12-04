@@ -9,8 +9,25 @@ const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
 const fetchBlotters = async () => {
-  const response = await fetch(`${apiBaseUrl}blotters/getBlotters`);
-  if (!response.ok) throw new Error("Unable to fetch blotter reports");
+  // Get token from localStorage (adjust the key name if different)
+  const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+  
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+
+  const response = await fetch(`${apiBaseUrl}blotters/getBlotters`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Unable to fetch blotter reports");
+  }
+  
   const data = await response.json();
   return data?.data ?? [];
 };
@@ -20,17 +37,18 @@ const BlotterTable = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
 
-  const { data: blotters = [], isLoading, isError } = useQuery({
+  const { data: blotters = [], isLoading, isError, error } = useQuery({
     queryKey: ["blotters"],
     queryFn: fetchBlotters,
+    retry: 1,
   });
 
   const filteredBlotters = blotters.filter((b) => {
-    const name = `${b?.user_id?.personal_info?.given_name ?? ""} ${b?.user_id?.personal_info?.surname ?? ""}`.toLowerCase();
-    const type = (b?.incident?.incident_type ?? "").toLowerCase();
+    const reporter = `${b?.reporter?.fullName ?? ""}`.toLowerCase();
+    const type = (b?.incident?.type ?? "").toLowerCase();
     const status = (b?.status ?? "").toLowerCase();
 
-    return name.includes(searchQuery.toLowerCase()) &&
+    return reporter.includes(searchQuery.toLowerCase()) &&
            (typeFilter === "All" || type === typeFilter.toLowerCase()) &&
            (statusFilter === "All" || status === statusFilter.toLowerCase());
   });
@@ -48,7 +66,7 @@ const BlotterTable = () => {
           <Search size={20} className="text-gray-600 mr-3" />
           <input
             type="text"
-            placeholder="Search by applicant name or ID..."
+            placeholder="Search by reporter name..."
             className="bg-transparent w-full focus:outline-none text-gray-700"
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -79,6 +97,8 @@ const BlotterTable = () => {
             <option>Theft</option>
             <option>Robbery</option>
             <option>Assault</option>
+            <option>Accident</option>
+            <option>Other</option>
           </select>
         </div>
 
@@ -92,7 +112,7 @@ const BlotterTable = () => {
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-100">
             <tr>
-              <th className="p-3 text-gray-600 font-semibold">ID</th>
+              <th className="p-3 text-gray-600 font-semibold">BLOTTER #</th>
               <th className="p-3 text-gray-600 font-semibold">REPORTER</th>
               <th className="p-3 text-gray-600 font-semibold">TYPE</th>
               <th className="p-3 text-gray-600 font-semibold">DATE FILED</th>
@@ -109,7 +129,9 @@ const BlotterTable = () => {
             )}
             {isError && (
               <tr>
-                <td colSpan="7" className="p-3 text-center text-red-600">Unable to load reports.</td>
+                <td colSpan="7" className="p-3 text-center text-red-600">
+                  {error?.message || "Unable to load reports."}
+                </td>
               </tr>
             )}
             {!isLoading && !isError && filteredBlotters.length === 0 && (
@@ -119,28 +141,45 @@ const BlotterTable = () => {
             )}
             {!isLoading && !isError && filteredBlotters.map((item) => {
               const statusClass =
-                item.status === "NEW" ? "bg-red-100 text-red-600" :
-                item.status === "PENDING" ? "bg-yellow-100 text-yellow-700" :
-                "bg-green-100 text-green-700";
-              const reporter = `${item?.user_id?.personal_info?.given_name ?? ""} ${item?.user_id?.personal_info?.surname ?? ""}`.trim() || "Unknown";
-              const officer = `${item?.assigned_officer?.first_name ?? ""} ${item?.assigned_officer?.last_name ?? ""}`.trim() || "Unassigned";
-              const type = item?.incident?.incident_type ?? "Unknown";
+                item.status === "Pending" ? "bg-yellow-100 text-yellow-700" :
+                item.status === "Under Review" ? "bg-blue-100 text-blue-700" :
+                item.status === "Investigating" ? "bg-orange-100 text-orange-700" :
+                item.status === "Resolved" ? "bg-green-100 text-green-700" :
+                item.status === "Closed" ? "bg-gray-100 text-gray-700" :
+                "bg-red-100 text-red-600";
+              
+              const reporter = item?.reporter?.fullName || "Unknown";
+              const officer = item?.assigned_Officer 
+                ? `${item.assigned_Officer.first_name || ""} ${item.assigned_Officer.last_name || ""}`.trim()
+                : "Unassigned";
+              const type = item?.incident?.type ?? "Unknown";
+              const dateFormatted = new Date(item.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              });
+              
               return (
                 <tr key={item._id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 text-purple-600 font-medium">{item._id}</td>
+                  <td className="p-3 text-purple-600 font-medium">{item.blotterNumber || item.custom_id}</td>
                   <td className="p-3">{reporter}</td>
                   <td className="p-3">{type}</td>
-                  <td className="p-3">{item.created_at}</td>
+                  <td className="p-3">{dateFormatted}</td>
                   <td className="p-3">
-                    <span className={`${statusClass} px-3 py-1 text-sm font-semibold rounded-full`}>{item.status}</span>
+                    <span className={`${statusClass} px-3 py-1 text-sm font-semibold rounded-full`}>
+                      {item.status}
+                    </span>
                   </td>
                   <td className="p-3">{officer}</td>
                   <td className="p-3">
                     <ActionButton
-                      label={item.status === "NEW" ? "Assign & View" : "Update Status"}
-                      icon={item.status === "NEW" ? UserPlus : RefreshCw}
-                      variant={item.status === "NEW" ? "warning" : "accent"}
-                      onClick={() => {}}
+                      label={!item.assigned_Officer ? "Assign & View" : "Update Status"}
+                      icon={!item.assigned_Officer ? UserPlus : RefreshCw}
+                      variant={!item.assigned_Officer ? "warning" : "accent"}
+                      onClick={() => {
+                        // Handle view/update action
+                        console.log("Action for blotter:", item._id);
+                      }}
                     />
                   </td>
                 </tr>
@@ -181,7 +220,7 @@ const BlotterPage = () => {
                   ${isCollapsed ? 'ml-20' : 'ml-96'}
               `}
         >
-          <div className="sticky -top-10 -bottom-10 pt-4 bg-gray-100 z-20 pb-4 **w-full**">
+          <div className="sticky -top-10 -bottom-10 pt-4 bg-gray-100 z-20 pb-4 w-full">
             <AdminHeader title="Blotter Incident Reports" username="Admin User" />
           </div>
 
