@@ -60,6 +60,7 @@ const ProfilePage = () => {
     queryKey: ["officerProfile"],
     queryFn: fetchOfficerProfile,
     onSuccess: (data) => {
+      // Pre-fill formData with fetched user info
       setFormData({
         first_name: data.first_name || "",
         last_name: data.last_name || "",
@@ -147,6 +148,7 @@ const ProfilePage = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setProfileImageData(null);
+    // Reset formData to current profile info
     if (profile) {
       setFormData({
         first_name: profile.first_name || "",
