@@ -4,8 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
 import ActionButton from "../Components/ActionButton";
-
-// Optional: if you have separate modals for view/edit
 import ViewBlotterModal from "../Components/ViewBlotterModal";
 import EditBlotterModal from "../Components/EditBlotterModal";
 
@@ -17,7 +15,10 @@ const fetchBlotters = async () => {
   if (!token) throw new Error("No authentication token found");
 
   const response = await fetch(`${apiBaseUrl}blotters/getBlotters`, {
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: { 
+      'Authorization': `Bearer ${token}`, 
+      'Content-Type': 'application/json' 
+    },
   });
 
   if (!response.ok) {
@@ -36,7 +37,7 @@ const BlotterTable = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
 
-  // For Modals
+  // Modal states
   const [selectedBlotter, setSelectedBlotter] = useState(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -52,17 +53,22 @@ const BlotterTable = () => {
     const type = (b?.incident?.type ?? "").toLowerCase();
     const status = (b?.status ?? "").toLowerCase();
 
-    return reporter.includes(searchQuery.toLowerCase()) &&
-           (typeFilter === "All" || type === typeFilter.toLowerCase()) &&
-           (statusFilter === "All" || status === statusFilter.toLowerCase());
+    return (
+      reporter.includes(searchQuery.toLowerCase()) &&
+      (typeFilter === "All" || type === typeFilter.toLowerCase()) &&
+      (statusFilter === "All" || status === statusFilter.toLowerCase())
+    );
   });
 
-  // Delete Blotter
+  // Delete Blotter mutation
   const deleteBlotter = async (id) => {
     const token = localStorage.getItem('token') || localStorage.getItem('authToken');
     const response = await fetch(`${apiBaseUrl}blotters/delete/${id}`, {
       method: "DELETE",
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { 
+        "Authorization": `Bearer ${token}`, 
+        "Content-Type": "application/json" 
+      },
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || "Failed to delete blotter");
@@ -71,7 +77,13 @@ const BlotterTable = () => {
 
   const { mutate: mutateDeleteBlotter } = useMutation({
     mutationFn: deleteBlotter,
-    onSuccess: () => queryClient.invalidateQueries(["blotters"]),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["blotters"]);
+      alert("Blotter deleted successfully!");
+    },
+    onError: (err) => {
+      alert(err.message || "Failed to delete blotter");
+    },
   });
 
   const handleDeleteBlotter = (id) => {
@@ -80,12 +92,31 @@ const BlotterTable = () => {
     }
   };
 
+  const getStatusClass = (status) => {
+    switch (status) {
+      case "Pending":
+        return "bg-yellow-100 text-yellow-700";
+      case "Under Review":
+        return "bg-blue-100 text-blue-700";
+      case "Investigating":
+        return "bg-orange-100 text-orange-700";
+      case "Resolved":
+        return "bg-green-100 text-green-700";
+      case "Closed":
+        return "bg-gray-100 text-gray-700";
+      default:
+        return "bg-red-100 text-red-600";
+    }
+  };
+
   return (
     <>
+      {/* Header Section */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
         <h2 className="text-3xl font-bold">Blotter Incident Reports</h2>
       </div>
 
+      {/* Filters Section */}
       <div className="bg-white p-6 rounded-xl shadow mb-6 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
         <div className="flex items-center bg-gray-100 rounded-lg px-4 py-2 w-full md:w-1/2 shadow">
           <Search size={20} className="text-gray-600 mr-3" />
@@ -99,9 +130,9 @@ const BlotterTable = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          <label className="text-gray-700">Status:</label>
+          <label className="text-gray-700 font-medium">Status:</label>
           <select
-            className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -115,9 +146,9 @@ const BlotterTable = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          <label className="text-gray-700">Type:</label>
+          <label className="text-gray-700 font-medium">Type:</label>
           <select
-            className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
           >
@@ -130,11 +161,12 @@ const BlotterTable = () => {
           </select>
         </div>
 
-        <button className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg shadow font-medium">
+        <button className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg shadow font-medium transition-colors">
           Export user list
         </button>
       </div>
 
+      {/* Table Section */}
       <div className="bg-white p-6 rounded-xl shadow overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-100">
@@ -151,30 +183,32 @@ const BlotterTable = () => {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan="7" className="p-3 text-center text-gray-600">Loading blotter reports…</td>
+                <td colSpan="7" className="p-6 text-center text-gray-600">
+                  <div className="flex items-center justify-center gap-2">
+                    <RefreshCw className="animate-spin" size={20} />
+                    Loading blotter reports…
+                  </div>
+                </td>
               </tr>
             )}
+            
             {isError && (
               <tr>
-                <td colSpan="7" className="p-3 text-center text-red-600">
+                <td colSpan="7" className="p-6 text-center text-red-600">
                   {error?.message || "Unable to load reports."}
                 </td>
               </tr>
             )}
+            
             {!isLoading && !isError && filteredBlotters.length === 0 && (
               <tr>
-                <td colSpan="7" className="p-3 text-center text-gray-700">No records found.</td>
+                <td colSpan="7" className="p-6 text-center text-gray-700">
+                  No records found.
+                </td>
               </tr>
             )}
+            
             {!isLoading && !isError && filteredBlotters.map((item) => {
-              const statusClass =
-                item.status === "Pending" ? "bg-yellow-100 text-yellow-700" :
-                item.status === "Under Review" ? "bg-blue-100 text-blue-700" :
-                item.status === "Investigating" ? "bg-orange-100 text-orange-700" :
-                item.status === "Resolved" ? "bg-green-100 text-green-700" :
-                item.status === "Closed" ? "bg-gray-100 text-gray-700" :
-                "bg-red-100 text-red-600";
-              
               const reporter = item?.reporter?.fullName || "Unknown";
               const officer = item?.assigned_Officer 
                 ? `${item.assigned_Officer.first_name || ""} ${item.assigned_Officer.last_name || ""}`.trim()
@@ -187,13 +221,15 @@ const BlotterTable = () => {
               });
               
               return (
-                <tr key={item._id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 text-purple-600 font-medium">{item.blotterNumber || item.custom_id}</td>
+                <tr key={item._id} className="border-b hover:bg-gray-50 transition-colors">
+                  <td className="p-3 text-purple-600 font-medium">
+                    {item.blotterNumber || item.custom_id}
+                  </td>
                   <td className="p-3">{reporter}</td>
                   <td className="p-3">{type}</td>
                   <td className="p-3">{dateFormatted}</td>
                   <td className="p-3">
-                    <span className={`${statusClass} px-3 py-1 text-sm font-semibold rounded-full`}>
+                    <span className={`${getStatusClass(item.status)} px-3 py-1 text-sm font-semibold rounded-full`}>
                       {item.status}
                     </span>
                   </td>
@@ -205,14 +241,20 @@ const BlotterTable = () => {
                         icon={Eye}
                         variant="info"
                         size="sm"
-                        onClick={() => { setSelectedBlotter(item); setIsViewOpen(true); }}
+                        onClick={() => { 
+                          setSelectedBlotter(item); 
+                          setIsViewOpen(true); 
+                        }}
                       />
                       <ActionButton
                         label="Edit"
                         icon={Pencil}
                         variant="accent"
                         size="sm"
-                        onClick={() => { setSelectedBlotter(item); setIsEditOpen(true); }}
+                        onClick={() => { 
+                          setSelectedBlotter(item); 
+                          setIsEditOpen(true); 
+                        }}
                       />
                       <ActionButton
                         label="Delete"
@@ -230,18 +272,25 @@ const BlotterTable = () => {
         </table>
       </div>
 
-      {/* Modals */}
+      {/* Modals - Notice: No officers prop needed anymore! */}
       {isViewOpen && selectedBlotter && (
         <ViewBlotterModal
           isOpen={isViewOpen}
-          onClose={() => setIsViewOpen(false)}
+          onClose={() => {
+            setIsViewOpen(false);
+            setSelectedBlotter(null);
+          }}
           blotter={selectedBlotter}
         />
       )}
+      
       {isEditOpen && selectedBlotter && (
         <EditBlotterModal
           isOpen={isEditOpen}
-          onClose={() => setIsEditOpen(false)}
+          onClose={() => {
+            setIsEditOpen(false);
+            setSelectedBlotter(null);
+          }}
           blotter={selectedBlotter}
         />
       )}
@@ -250,16 +299,16 @@ const BlotterTable = () => {
 };
 
 const BlotterPage = () => {
-  const [isCollapsed, setIsCollapsed] = React.useState(() => {
+  const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
   }); 
   
   const toggleCollapse = () => {
     setIsCollapsed(prev => {
-        const newValue = !prev;
-        localStorage.setItem('sidebarCollapsed', JSON.stringify(newValue));
-        return newValue;
+      const newValue = !prev;
+      localStorage.setItem('sidebarCollapsed', JSON.stringify(newValue));
+      return newValue;
     });
   };
 
@@ -270,11 +319,12 @@ const BlotterPage = () => {
         isCollapsed={isCollapsed}
         toggleCollapse={toggleCollapse}
       />
-      <main className={`
-                flex-1 h-screen overflow-y-auto bg-gray-100 p-10 
-                transition-all duration-300 
-                ${isCollapsed ? 'ml-20' : 'ml-96'}
-            `}
+      <main 
+        className={`
+          flex-1 h-screen overflow-y-auto bg-gray-100 p-10 
+          transition-all duration-300 
+          ${isCollapsed ? 'ml-20' : 'ml-96'}
+        `}
       >
         <div className="sticky -top-10 -bottom-10 pt-4 bg-gray-100 z-20 pb-4 w-full">
           <AdminHeader title="Blotter Incident Reports" username="Admin User" />
