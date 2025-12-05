@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { UserCircle, Edit2, Camera } from "lucide-react";
+import { UserCircle, Edit2, Camera, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
@@ -34,7 +34,7 @@ const updateOfficerProfile = async (profileData) => {
 const ProfilePage = () => {
   const queryClient = useQueryClient();
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem("sidebarCollapsed");
+    const saved = window.localStorage?.getItem("sidebarCollapsed");
     return saved ? JSON.parse(saved) : false;
   });
 
@@ -47,11 +47,14 @@ const ProfilePage = () => {
     radio_id: "",
   });
   const [profileImageData, setProfileImageData] = useState(null);
+  const [removeProfilePicture, setRemoveProfilePicture] = useState(false);
 
   const toggleCollapse = () => {
     setIsCollapsed((prev) => {
       const newValue = !prev;
-      localStorage.setItem("sidebarCollapsed", JSON.stringify(newValue));
+      if (window.localStorage) {
+        window.localStorage.setItem("sidebarCollapsed", JSON.stringify(newValue));
+      }
       return newValue;
     });
   };
@@ -59,17 +62,20 @@ const ProfilePage = () => {
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ["officerProfile"],
     queryFn: fetchOfficerProfile,
-    onSuccess: (data) => {
-      // Pre-fill formData with fetched user info
-      setFormData({
-        first_name: data.first_name || "",
-        last_name: data.last_name || "",
-        email: data.email || "",
-        mobile_number: data.contact?.mobile_number || "",
-        radio_id: data.contact?.radio_id || "",
-      });
-    },
   });
+
+  // Update formData when profile is loaded
+  React.useEffect(() => {
+    if (profile) {
+      setFormData({
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        email: profile.email || "",
+        mobile_number: profile.contact?.mobile_number || "",
+        radio_id: profile.contact?.radio_id || "",
+      });
+    }
+  }, [profile]);
 
   const { data: profileImageUrl } = useQuery({
     queryKey: ["officerProfilePicture"],
@@ -87,18 +93,33 @@ const ProfilePage = () => {
     }
   };
 
+  const deleteProfilePicture = async () => {
+    const pictureResponse = await api.delete("/officers/profile/picture");
+    const pictureData = await pictureResponse.json();
+    if (!pictureResponse.ok || !pictureData.success) {
+      throw new Error(pictureData.message || "Unable to remove profile picture");
+    }
+  };
+
   const { mutate: updateProfile, isLoading: isUpdating } = useMutation({
     mutationFn: updateOfficerProfile,
     onSuccess: async () => {
       try {
-        if (profileImageData) {
+        // Handle profile picture removal
+        if (removeProfilePicture) {
+          await deleteProfilePicture();
+          setRemoveProfilePicture(false);
+        }
+        // Handle profile picture upload
+        else if (profileImageData) {
           await updateProfilePicture(
             profileImageData.data,
             profileImageData.filename,
             profileImageData.mimetype
           );
-          setProfileImageData(null);
         }
+        
+        setProfileImageData(null);
         await queryClient.invalidateQueries(["officerProfile"]);
         await queryClient.invalidateQueries(["officerProfilePicture"]);
         setIsEditing(false);
@@ -132,12 +153,18 @@ const ProfilePage = () => {
         filename: file.name,
         mimetype: file.type,
       });
+      setRemoveProfilePicture(false); // Cancel removal if new image selected
     };
     reader.onerror = () => {
       alert("Failed to read image file");
       setProfileImageData(null);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleRemoveProfilePicture = () => {
+    setRemoveProfilePicture(true);
+    setProfileImageData(null);
   };
 
   const handleSubmit = (e) => {
@@ -148,7 +175,7 @@ const ProfilePage = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setProfileImageData(null);
-    // Reset formData to current profile info
+    setRemoveProfilePicture(false);
     if (profile) {
       setFormData({
         first_name: profile.first_name || "",
@@ -162,12 +189,41 @@ const ProfilePage = () => {
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
-      localStorage.removeItem("token");
+      if (window.localStorage) {
+        window.localStorage.removeItem("token");
+      }
       window.location.href = "/";
     }
   };
 
-  const displayImageUrl = profileImageData ? profileImageData.data : profileImageUrl;
+  const handleDeleteAccount = async () => {
+    if (window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+      if (window.confirm("This will permanently delete all your data. Are you absolutely sure?")) {
+        try {
+          const response = await api.delete("/officers/profile");
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            alert("Account deleted successfully");
+            if (window.localStorage) {
+              window.localStorage.removeItem("token");
+            }
+            window.location.href = "/";
+          } else {
+            alert("Failed to delete account: " + (data.message || "Unknown error"));
+          }
+        } catch (error) {
+          console.error("Delete account error:", error);
+          alert("Failed to delete account: " + error.message);
+        }
+      }
+    }
+  };
+
+  // Determine which image to display
+  const displayImageUrl = removeProfilePicture 
+    ? null 
+    : (profileImageData ? profileImageData.data : profileImageUrl);
 
   if (isLoading)
     return (
@@ -243,23 +299,39 @@ const ProfilePage = () => {
                   )}
                 </div>
                 {isEditing && (
-                  <label
-                    htmlFor="profileImage"
-                    className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow-md cursor-pointer hover:bg-gray-100"
-                  >
-                    <Camera size={20} className="text-gray-600" />
-                    <input
-                      type="file"
-                      id="profileImage"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleProfileImageChange}
-                    />
-                  </label>
+                  <>
+                    <label
+                      htmlFor="profileImage"
+                      className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow-md cursor-pointer hover:bg-gray-100"
+                    >
+                      <Camera size={20} className="text-gray-600" />
+                      <input
+                        type="file"
+                        id="profileImage"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleProfileImageChange}
+                      />
+                    </label>
+                    {(displayImageUrl || profileImageData) && !removeProfilePicture && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveProfilePicture}
+                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 p-2 rounded-full shadow-md"
+                        title="Remove profile picture"
+                      >
+                        <X size={20} className="text-white" />
+                      </button>
+                    )}
+                  </>
                 )}
                 {isEditing && (
                   <p className="mt-2 text-sm text-gray-500 text-center">
-                    {profileImageData ? "New image selected" : "Change profile picture"}
+                    {removeProfilePicture 
+                      ? "Picture will be removed" 
+                      : profileImageData 
+                      ? "New image selected" 
+                      : "Change profile picture"}
                   </p>
                 )}
               </div>
@@ -385,6 +457,13 @@ const ProfilePage = () => {
                       className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-2 rounded-lg font-medium"
                     >
                       Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteAccount}
+                      className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium ml-auto"
+                    >
+                      Delete Account
                     </button>
                   </div>
                 </form>

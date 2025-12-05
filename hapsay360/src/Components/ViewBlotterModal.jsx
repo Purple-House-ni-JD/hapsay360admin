@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, User, Calendar, FileText, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { X, User, Calendar, FileText, CheckCircle, AlertCircle, Trash2, Download } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import Modal from './Modal';
 import api from '../utils/api';
@@ -28,11 +28,65 @@ const ViewBlotterModal = ({ isOpen, onClose, blotter, onEdit }) => {
   // Cleanup blob URL when component unmounts
   React.useEffect(() => {
     return () => {
+  // Fetch all blotter attachments as blobs
+  const { data: attachmentUrls, isLoading: attachmentsLoading, error: attachmentsError } = useQuery({
+    queryKey: ['blotterAttachments', blotter?._id],
+    queryFn: async () => {
+      if (!blotter?._id || !blotter?.attachments || blotter.attachments.length === 0) {
+        return [];
+      }
+      
+      // Fetch each attachment as a blob
+      const urls = await Promise.all(
+        blotter.attachments.map(async (att, index) => {
+          try {
+            const response = await api.get(`/blotters/${blotter._id}/attachments/${index}`);
+            
+            if (!response.ok) {
+              console.error(`Attachment ${index} not found (${response.status})`);
+              return null;
+            }
+            
+            const blob = await response.blob();
+            
+            return {
+              url: URL.createObjectURL(blob),
+              filename: att.filename || `Attachment ${index + 1}`,
+              mimetype: att.mimetype || 'application/octet-stream',
+              index: index
+            };
+          } catch (error) {
+            console.error(`Failed to fetch attachment ${index}:`, error);
+            return null;
+          }
+        })
+      );
+      
+      return urls.filter(Boolean);
+    },
+    enabled: isOpen && !!blotter?._id && !!blotter?.attachments && blotter.attachments.length > 0,
+    retry: 1,
+    staleTime: 0,
+  });
+
+  // Cleanup blob URLs when component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (attachmentUrls) {
+        attachmentUrls.forEach(att => {
+          if (att?.url) {
+            URL.revokeObjectURL(att.url);
+          }
+        });
+      }
+      if (userProfilePicUrl) {
+        URL.revokeObjectURL(userProfilePicUrl);
+      }
       if (officerProfilePicUrl) {
         URL.revokeObjectURL(officerProfilePicUrl);
       }
     };
-  }, [officerProfilePicUrl]);
+  }, [attachmentUrls, userProfilePicUrl, officerProfilePicUrl]);
 
   const deleteBlotter = async () => {
     const response = await api.delete(`blotters/delete/${blotter._id}`);
@@ -86,7 +140,21 @@ const ViewBlotterModal = ({ isOpen, onClose, blotter, onEdit }) => {
     : 'Unknown User';
   const userEmail = blotter?.user_id?.email || 'N/A';
   const userPhone = blotter?.user_id?.phone_number || 'N/A';
-  const userProfilePic = blotter?.user_id?.profile_picture;
+
+  // Helper to download attachment
+  const downloadAttachment = (attachmentUrl, filename) => {
+    const link = document.createElement('a');
+    link.href = attachmentUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Helper to determine if attachment is an image
+  const isImage = (mimetype) => {
+    return mimetype && mimetype.startsWith('image/');
+  };
 
   return (
     <Modal onClose={onClose} maxWidth="max-w-2xl">
@@ -99,10 +167,11 @@ const ViewBlotterModal = ({ isOpen, onClose, blotter, onEdit }) => {
         </div>
 
         <div className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+          {/* User who filed the blotter */}
           <div className="flex items-center gap-4 mb-4">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden border">
-              {userProfilePic ? (
-                <img src={userProfilePic} alt="User" className="w-full h-full object-cover" />
+              {userProfilePicUrl ? (
+                <img src={userProfilePicUrl} alt="User" className="w-full h-full object-cover" />
               ) : (
                 <User size={32} className="text-gray-400" />
               )}
@@ -185,17 +254,64 @@ const ViewBlotterModal = ({ isOpen, onClose, blotter, onEdit }) => {
             </div>
           </div>
 
+          {/* Attachments Section with Blob URLs */}
           <div className="bg-white border border-gray-100 rounded-lg p-4 space-y-3">
-            <p className="text-sm text-gray-500 mb-2">Attachments</p>
-            {blotter.attachments && blotter.attachments.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                {blotter.attachments.map((att, idx) => (
-                  <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 hover:underline">
-                    <FileText size={16} />
-                    <span>{att.name || att.type || "Attachment"}</span>
-                  </a>
+            <p className="text-sm text-gray-500 mb-2">
+              Attachments {blotter?.attachments?.length > 0 && `(${blotter.attachments.length})`}
+            </p>
+            
+            {attachmentsLoading ? (
+              <p className="text-gray-400">Loading attachments...</p>
+            ) : attachmentsError ? (
+              <p className="text-red-500">Error loading attachments: {attachmentsError.message}</p>
+            ) : attachmentUrls && attachmentUrls.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3">
+                {attachmentUrls.map((att, idx) => (
+                  <div key={idx} className="border border-gray-200 rounded-lg p-3">
+                    {isImage(att.mimetype) ? (
+                      // Display image preview
+                      <div className="space-y-2">
+                        <img 
+                          src={att.url} 
+                          alt={att.filename} 
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 truncate flex-1">
+                            {att.filename}
+                          </span>
+                          <button
+                            onClick={() => downloadAttachment(att.url, att.filename)}
+                            className="flex items-center gap-1 text-purple-600 hover:text-purple-700 text-sm"
+                          >
+                            <Download size={16} />
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Display file with download button
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-1">
+                          <FileText size={16} className="text-gray-400" />
+                          <span className="text-sm text-gray-600 truncate">
+                            {att.filename}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => downloadAttachment(att.url, att.filename)}
+                          className="flex items-center gap-1 text-purple-600 hover:text-purple-700 text-sm"
+                        >
+                          <Download size={16} />
+                          Download
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
+            ) : blotter?.attachments?.length > 0 ? (
+              <p className="text-yellow-600">Failed to load {blotter.attachments.length} attachment(s)</p>
             ) : (
               <p className="text-gray-400">No attachments</p>
             )}
