@@ -10,6 +10,7 @@ import EditBlotterModal from "../Components/EditBlotterModal";
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
 
+// Fetch blotters
 const fetchBlotters = async () => {
   const token = localStorage.getItem('token') || localStorage.getItem('authToken');
   if (!token) throw new Error("No authentication token found");
@@ -28,6 +29,53 @@ const fetchBlotters = async () => {
 
   const data = await response.json();
   return data?.data ?? [];
+};
+
+// Export blotters to CSV
+const exportBlottersToCSV = (blotters) => {
+  if (!blotters || blotters.length === 0) return;
+
+  const headers = [
+    "Blotter #",
+    "Reporter",
+    "Type",
+    "Date Filed",
+    "Status",
+    "Assigned Officer",
+  ];
+
+  const rows = blotters.map((b) => [
+    b.blotterNumber || b.custom_id || "",
+    b.reporter?.fullName || "Unknown",
+    b.incident?.type || "Unknown",
+    b.created_at
+      ? new Date(b.created_at).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "",
+    b.status || "",
+    b.assigned_Officer
+      ? `${b.assigned_Officer.first_name || ""} ${b.assigned_Officer.last_name || ""}`.trim()
+      : "Unassigned",
+  ]);
+
+  const csvContent = [
+    headers.join(","),
+    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute(
+    "download",
+    `blotters_${new Date().toISOString().split("T")[0]}.csv`
+  );
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 const BlotterTable = () => {
@@ -90,6 +138,10 @@ const BlotterTable = () => {
     if (window.confirm("Are you sure you want to delete this blotter?")) {
       mutateDeleteBlotter(id);
     }
+  };
+
+  const handleExport = () => {
+    exportBlottersToCSV(filteredBlotters);
   };
 
   const getStatusClass = (status) => {
@@ -161,8 +213,11 @@ const BlotterTable = () => {
           </select>
         </div>
 
-        <button className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg shadow font-medium transition-colors">
-          Export user list
+        <button
+          onClick={handleExport}
+          className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg shadow font-medium transition-colors"
+        >
+          Export blotter list
         </button>
       </div>
 
@@ -272,7 +327,7 @@ const BlotterTable = () => {
         </table>
       </div>
 
-      {/* Modals - Notice: No officers prop needed anymore! */}
+      {/* Modals */}
       {isViewOpen && selectedBlotter && (
         <ViewBlotterModal
           isOpen={isViewOpen}
