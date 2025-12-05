@@ -28,65 +28,11 @@ const ViewBlotterModal = ({ isOpen, onClose, blotter, onEdit }) => {
   // Cleanup blob URL when component unmounts
   React.useEffect(() => {
     return () => {
-  // Fetch all blotter attachments as blobs
-  const { data: attachmentUrls, isLoading: attachmentsLoading, error: attachmentsError } = useQuery({
-    queryKey: ['blotterAttachments', blotter?._id],
-    queryFn: async () => {
-      if (!blotter?._id || !blotter?.attachments || blotter.attachments.length === 0) {
-        return [];
-      }
-      
-      // Fetch each attachment as a blob
-      const urls = await Promise.all(
-        blotter.attachments.map(async (att, index) => {
-          try {
-            const response = await api.get(`/blotters/${blotter._id}/attachments/${index}`);
-            
-            if (!response.ok) {
-              console.error(`Attachment ${index} not found (${response.status})`);
-              return null;
-            }
-            
-            const blob = await response.blob();
-            
-            return {
-              url: URL.createObjectURL(blob),
-              filename: att.filename || `Attachment ${index + 1}`,
-              mimetype: att.mimetype || 'application/octet-stream',
-              index: index
-            };
-          } catch (error) {
-            console.error(`Failed to fetch attachment ${index}:`, error);
-            return null;
-          }
-        })
-      );
-      
-      return urls.filter(Boolean);
-    },
-    enabled: isOpen && !!blotter?._id && !!blotter?.attachments && blotter.attachments.length > 0,
-    retry: 1,
-    staleTime: 0,
-  });
-
-  // Cleanup blob URLs when component unmounts
-  React.useEffect(() => {
-    return () => {
-      if (attachmentUrls) {
-        attachmentUrls.forEach(att => {
-          if (att?.url) {
-            URL.revokeObjectURL(att.url);
-          }
-        });
-      }
-      if (userProfilePicUrl) {
-        URL.revokeObjectURL(userProfilePicUrl);
-      }
       if (officerProfilePicUrl) {
         URL.revokeObjectURL(officerProfilePicUrl);
       }
     };
-  }, [attachmentUrls, userProfilePicUrl, officerProfilePicUrl]);
+  }, [officerProfilePicUrl]);
 
   const deleteBlotter = async () => {
     const response = await api.delete(`blotters/delete/${blotter._id}`);
