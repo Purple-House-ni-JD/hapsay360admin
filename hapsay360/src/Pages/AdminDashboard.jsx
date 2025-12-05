@@ -1,5 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   Home,
   FileText,
@@ -14,6 +15,7 @@ import {
 import DashboardCard from "../Components/DashboardCard";
 import AdminHeader from "../Components/AdminHeader";
 import Sidebar from "../Components/Sidebar";
+import AnnouncementModal from "../Components/AnnouncementModal";
 import api from "../utils/api";
 import ActionButton from "../Components/ActionButton";
 
@@ -40,6 +42,15 @@ const fetchBlotters = async () => {
   const response = await api.get("blotters/getBlotters");
   if (!response.ok) {
     throw new Error("Unable to fetch blotter reports");
+  }
+  const data = await response.json();
+  return data?.data ?? [];
+};
+
+const fetchAnnouncements = async () => {
+  const response = await api.get("announcements/");
+  if (!response.ok) {
+    throw new Error("Unable to fetch announcements");
   }
   const data = await response.json();
   return data?.data ?? [];
@@ -135,7 +146,14 @@ const LatestClearanceTable = () => {
     queryFn: fetchClearances,
   });
 
+  const navigate = useNavigate();
+
+  const navigateToClearancePage = () => {
+      navigate("/ClearancePage");
+  }
+
   const renderBody = () => {
+    
     if (isLoading) {
       return (
         <tr>
@@ -216,42 +234,136 @@ const LatestClearanceTable = () => {
         variant="link"
         size="md"
         className="mt-3"
-        onClick={() => {}}
+        onClick={() => navigateToClearancePage()}
       />
     </div>
   );
 };
 
-const Announcements = () => (
+const Announcements = () => {
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = React.useState(false);
+  const navigate = useNavigate();
+  const navigateToAnnouncement = () => {
+    navigate("/AnnouncementPage");
+  }
+  const {
+    data: announcements = [],
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["announcements"],
+    queryFn: fetchAnnouncements,
+  });
 
-  <div className="bg-white p-6 rounded-xl shadow-lg">
-    <h3 className="text-2xl font-bold mb-4">Station Announcements</h3>
-    <div className="flex flex-col gap-4">
-      <div className="border p-4 rounded-lg hover:bg-gray-50">
-        <p className="font-semibold">New PWD ID Processing Hours</p>
-        <p className="text-sm text-gray-600">
-          Details updated regarding the PWD field in the User table.
-        </p>
-        <p className="text-xs text-gray-400 mt-1">2025-11-10</p>
+  const {
+    data: stations = [],
+  } = useQuery({
+    queryKey: ["stations"],
+    queryFn: async () => {
+      const response = await api.get("police-stations/getStations");
+      if (!response.ok) {
+        throw new Error("Unable to fetch stations");
+      }
+      const data = await response.json();
+      return data?.data ?? [];
+    },
+  });
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="p-6 text-center text-gray-600">
+          Loading announcements...
+        </div>
+      );
+    }
+
+    if (isError) {
+      return (
+        <div className="p-6 text-center text-red-600">
+          Unable to load announcements right now.
+        </div>
+      );
+    }
+
+    if (!announcements.length) {
+      return (
+        <div className="p-6 text-center text-gray-700">
+          No announcements yet. Create one to get started!
+        </div>
+      );
+    }
+
+    const latestAnnouncements = announcements.slice(0, 3);
+
+    return (
+      <div className="space-y-4">
+        {latestAnnouncements.map((announcement) => (
+          <div
+            key={announcement._id}
+            className="border-l-4 border-purple-600 bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h4 className="text-lg font-semibold text-gray-800">
+                  {announcement.title}
+                </h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  {announcement.station_id?.name || "All Stations"}
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  {new Date(announcement.created_at).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                </p>
+              </div>
+              <span
+                className={`px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap ml-4 ${
+                  announcement.status === "PUBLISHED"
+                    ? "bg-green-100 text-green-700"
+                    : announcement.status === "DRAFT"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                {announcement.status}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="border p-4 rounded-lg hover:bg-gray-50">
-        <p className="font-semibold">Barangay Security Meeting Schedule</p>
-        <p className="text-sm text-gray-600">
-          Mandatory attendance for all Police Officers assigned to San Jose
-          Station.
-        </p>
-        <p className="text-xs text-gray-400 mt-1">2025-11-10</p>
+    );
+  };
+
+  return (
+    <>
+      <AnnouncementModal
+        isOpen={isAnnouncementModalOpen}
+        onClose={() => setIsAnnouncementModalOpen(false)}
+        onPosted={() => {}}
+        stations={stations}
+      />
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-2xl font-bold">Recent Announcements</h3>
+        </div>
+        {renderContent()}
+        {announcements.length > 0 && (
+          <ActionButton
+            label="View All Announcements"
+            icon={ArrowRight}
+            variant="link"
+            size="md"
+            className="mt-4"
+            onClick={() => navigateToAnnouncement()}
+          />
+        )}
       </div>
-      <div className="border p-4 rounded-lg hover:bg-gray-50">
-        <p className="font-semibold">New PWD ID Processing Hours</p>
-        <p className="text-sm text-gray-600">
-          The system will be offline for 2 hours on Friday for database updates.
-        </p>
-        <p className="text-xs text-gray-400 mt-1">2025-11-10</p>
-      </div>
-    </div>
-  </div>
-);
+    </>
+  );
+};
 
 const AdminDashboard = () => {
     const [isCollapsed, setIsCollapsed] = React.useState(() => {
