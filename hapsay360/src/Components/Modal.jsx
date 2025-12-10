@@ -1,12 +1,5 @@
 import React, { useEffect } from 'react';
 
-// Reusable Modal component
-// Props:
-// - children: modal content
-// - onClose: function to call when backdrop clicked or Escape pressed
-// - maxWidth: optional tailwind max-w-* class (default: max-w-2xl)
-// - className: additional classes for the panel
-
 const Modal = ({ children, onClose, maxWidth = 'max-w-2xl', className = '' }) => {
   useEffect(() => {
     const prev = document.body.style.overflow;

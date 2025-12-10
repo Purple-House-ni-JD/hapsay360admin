@@ -89,13 +89,11 @@ const AnnouncementModal = ({ isOpen = true, onClose = () => {}, onPosted, statio
 		for (const f of arr) {
 			try {
 				const dataUrl = await fileToDataUrl(f);
-				// Only insert images into the editor; other files are just stored as attachments
 				if (f.type.startsWith('image/')) {
 					if (editor) {
 						editor.chain().focus().setImage({ src: dataUrl, alt: f.name }).run();
 					}
 				}
-				// store additional metadata so consumers can read mime type and original file
 				setAttachedFiles((s) => [...s, { name: f.name, dataUrl, type: f.type, size: f.size, file: f }]);
 			} catch (err) {
 				console.error('Failed to read file', err);
@@ -122,7 +120,6 @@ const AnnouncementModal = ({ isOpen = true, onClose = () => {}, onPosted, statio
 			return;
 		}
 		const details = editor ? editor.getHTML() : '';
-		// Check if details is essentially empty (just <p></p> or whitespace)
 		const cleanedDetails = details.replace(/<[^>]+>/g, '').trim();
 		if (!cleanedDetails) {
 			alert('Please add some content to the announcement.');
@@ -139,7 +136,7 @@ const AnnouncementModal = ({ isOpen = true, onClose = () => {}, onPosted, statio
 			}));
 		}
 
-		// Create announcement with base64 attachments (will be converted to Buffer on backend)
+		// Create announcement with base64 attachments
 		const payload = {
 			title: title.trim(),
 			details: cleanedDetails,

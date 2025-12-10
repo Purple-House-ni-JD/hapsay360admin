@@ -79,7 +79,6 @@ const GoogleMapPicker = ({ initialPosition, onLocationSelect }) => {
   );
 };
 
-// --- AddStationModal Component ---
 const AddStationModal = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();
 
@@ -108,15 +107,12 @@ const AddStationModal = ({ isOpen, onClose }) => {
     return data;
   };
 
-  // API function using the correct endpoint
-
   const { mutate: addStationMutation, isLoading: isSubmitting, isError, error: mutationError } = useMutation({
     mutationFn: addStation,
     onSuccess: (data) => {
       console.log("Station added successfully", data);
       queryClient.invalidateQueries({ queryKey: ["stations"] });
       setIsAddStationSuccess(true);
-      // Reset form
       setFormData({
         name: "",
         address: "",
@@ -155,7 +151,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
     e.preventDefault();
     setError(null);
 
-    // Frontend Validation
     const requiredFields = {
       name: formData.name,
       address: formData.address,
@@ -188,7 +183,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
       return;
     }
 
-    // Submit the form
     addStationMutation(formData);
   };
 
@@ -208,7 +202,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
         }
       : null;
 
-  // Return null AFTER all hooks have been called
   if (!isOpen) return null;
 
   return (
@@ -228,7 +221,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Success Message */}
         {isAddStationSuccess && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
             <CheckCircle className="text-green-500" size={20} />
@@ -240,7 +232,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* Error Message */}
         {(error || isError) && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
             <AlertTriangle size={20} />
@@ -260,7 +251,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
                 Station Details
               </h4>
 
-              {/* Name (Required) */}
               <div>
                 <label
                   htmlFor="name"
@@ -280,7 +270,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
                 />
               </div>
 
-              {/* Address (Required) */}
               <div>
                 <label
                   htmlFor="address"
@@ -301,7 +290,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Phone Number (Required) */}
                 <div>
                   <label
                     htmlFor="phone_number"
@@ -321,7 +309,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
                   />
                 </div>
 
-                {/* Landline (Required) */}
                 <div>
                   <label
                     htmlFor="landline"
@@ -342,7 +329,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              {/* Email (Optional) */}
               <div>
                 <label
                   htmlFor="email"
@@ -361,7 +347,6 @@ const AddStationModal = ({ isOpen, onClose }) => {
                 />
               </div>
 
-              {/* Coordinates Display */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
