@@ -37,7 +37,7 @@ const StationsAndPersonnel = () => {
   // NEW: Store snapshot of data when export is clicked
   const [exportData, setExportData] = useState(null);
 
-  // Reset export data when view changes
+  // Reset export data when vienw changes
   useEffect(() => {
     return () => setExportData(null);
   }, [currentView]);
