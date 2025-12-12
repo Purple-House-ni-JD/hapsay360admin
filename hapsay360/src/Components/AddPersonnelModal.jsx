@@ -4,7 +4,7 @@ import React from "react";
 import { X, UserPlus, Send, Shield } from "lucide-react";
 import api from "../utils/api";
 
-const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
+const AddPersonnelModal = ({ isOpen, onClose, stations = [] }) => {
 	const queryClient = useQueryClient();
 
 	const [form, setForm] = useState({
@@ -61,10 +61,24 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 
 	const handleChange = (e) => {
 		const { name, value, type, checked } = e.target;
-		setForm((prevForm) => ({
-			...prevForm,
-			[name]: type === 'checkbox' ? checked : value,
-		}));
+		
+		// When switching between admin and officer, adjust form requirements
+		if (name === 'is_admin') {
+			const newIsAdmin = checked;
+			setForm((prevForm) => ({
+				...prevForm,
+				is_admin: newIsAdmin,
+				// Reset station for admins, keep for officers
+				station_id: newIsAdmin ? "" : prevForm.station_id,
+				// Clear password if switching from admin to officer
+				password: newIsAdmin ? prevForm.password : "",
+			}));
+		} else {
+			setForm((prevForm) => ({
+				...prevForm,
+				[name]: type === 'checkbox' ? checked : value,
+			}));
+		}
 	};
 
 	const handleSubmit = (e) => {
@@ -76,11 +90,17 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 			return;
 		}
 		
+		if (!form.is_admin && !form.mobile_number) {
+			alert("Please provide a mobile number for officer accounts.");
+			return;
+		}
+		
 		if (!form.is_admin && !form.station_id) {
 			alert("Please select a station for officer accounts.");
 			return;
 		}
 		
+		// Prepare payload
 		const payload = {
 			first_name: form.first_name,
 			last_name: form.last_name,
@@ -90,15 +110,16 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 			is_admin: form.is_admin,
 		};
 		
-		if (!form.is_admin) {
-			payload.station_id = form.station_id;
-		} else if (form.station_id) {
+		// Add station_id only if provided (admins don't need it)
+		if (form.station_id) {
 			payload.station_id = form.station_id;
 		}
 		
+		// Add password if provided (required for admins)
 		if (form.is_admin) {
 			payload.password = form.password;
-		} else if (form.password) {
+		} else if (form.password && form.password.length > 0) {
+			// Optional password for regular officers
 			payload.password = form.password;
 		}
 		
@@ -167,7 +188,7 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 					<div className="grid grid-cols-2 gap-4 mb-4">
 						<div>
 							<label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">
-								First Name
+								First Name <span className="text-red-500">*</span>
 							</label>
 							<input
 								type="text"
@@ -183,7 +204,7 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 						</div>
 						<div>
 							<label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">
-								Last Name
+								Last Name <span className="text-red-500">*</span>
 							</label>
 							<input
 								type="text"
@@ -203,7 +224,7 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 					<div className="grid grid-cols-2 gap-4 mb-4">
 						<div>
 							<label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-								Role
+								Role <span className="text-red-500">*</span>
 							</label>
 							<input
 								type="text"
@@ -219,7 +240,7 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 						</div>
 						<div>
 							<label htmlFor="mobile_number" className="block text-sm font-medium text-gray-700 mb-1">
-								Mobile Number
+								Mobile Number {!form.is_admin && <span className="text-red-500">*</span>}
 							</label>
 							<input
 								type="tel"
@@ -239,7 +260,7 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 					<div className="grid grid-cols-2 gap-4 mb-4">
 						<div>
 							<label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-								Email
+								Email <span className="text-red-500">*</span>
 							</label>
 							<input
 								type="email"
@@ -276,29 +297,30 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 						</div>
 					</div>
 
-					{/* Password Row */}
-					{form.is_admin && (
-						<div className="mb-4">
-							<label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-								Password <span className="text-red-500">*</span>
-							</label>
-							<input
-								type="password"
-								id="password"
-								name="password"
-								value={form.password}
-								onChange={handleChange}
-								placeholder="Minimum 6 characters"
-								required
-								minLength={6}
-								disabled={isLoading}
-								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
-							/>
-							<p className="text-xs text-gray-500 mt-1">
-								Password is required for admin accounts.
-							</p>
-						</div>
-					)}
+					{/* Password Row - Always show but with different requirements */}
+					<div className="mb-4">
+						<label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+							Password {form.is_admin && <span className="text-red-500">*</span>}
+						</label>
+						<input
+							type="password"
+							id="password"
+							name="password"
+							value={form.password}
+							onChange={handleChange}
+							placeholder={form.is_admin ? "Minimum 6 characters (required)" : "Optional - leave empty for auto-generated"}
+							required={form.is_admin}
+							minLength={form.is_admin ? 6 : 0}
+							disabled={isLoading}
+							className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
+						/>
+						<p className="text-xs text-gray-500 mt-1">
+							{form.is_admin 
+								? "Password is required for admin accounts." 
+								: "If left empty, a random password will be generated."
+							}
+						</p>
+					</div>
 
 					{/* Action Buttons */}
 					<div className="flex justify-end gap-3 pt-4 border-t">
@@ -332,4 +354,4 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 	);
 };
 
-export default AddPersonnelForm;
+export default AddPersonnelModal;
