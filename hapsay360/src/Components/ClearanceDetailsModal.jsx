@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, FileText, User, Calendar, CreditCard } from "lucide-react";
+import { X, FileText, User, Calendar, CreditCard, Image as ImageIcon } from "lucide-react";
 
 const apiBaseUrl = (
   import.meta.env.VITE_API_URL || "http://localhost:3000/api"
@@ -72,6 +72,69 @@ const ClearanceDetailsModal = ({ isOpen, onClose, clearanceId }) => {
     queryFn: () => fetchClearanceById(clearanceId),
     enabled: !!clearanceId && isOpen,
   });
+
+  // Fetch clearance attachments as blob URLs
+  const { data: attachmentUrls } = useQuery({
+    queryKey: ["clearanceAttachments", clearanceId],
+    queryFn: async () => {
+      if (!clearance?._id || !clearance?.attachments || clearance.attachments.length === 0) return {};
+      
+      const urls = {};
+      const token = localStorage.getItem("token");
+      
+      console.log('Fetching clearance attachments for:', clearance._id);
+      console.log('Total attachments:', clearance.attachments.length);
+      
+      try {
+        for (let i = 0; i < clearance.attachments.length; i++) {
+          try {
+            const url = `${apiBaseUrl}clearance/${clearance._id}/attachments/${i}`;
+            console.log(`Fetching attachment ${i} from:`, url);
+            
+            const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+            
+            console.log(`Attachment ${i} response status:`, response.status);
+            
+            if (!response.ok) {
+              console.error(`Failed to fetch attachment ${i}: ${response.status} ${response.statusText}`);
+              urls[i] = null;
+              continue;
+            }
+            
+            const blob = await response.blob();
+            console.log(`Attachment ${i} blob size:`, blob.size, 'type:', blob.type);
+            urls[i] = URL.createObjectURL(blob);
+            console.log(`Created object URL for attachment ${i}:`, urls[i]);
+          } catch (error) {
+            console.error(`Error fetching attachment ${i}:`, error);
+            urls[i] = null;
+          }
+        }
+        console.log('Final attachment URLs:', urls);
+        return urls;
+      } catch (error) {
+        console.error('Failed to fetch clearance attachments:', error);
+        return {};
+      }
+    },
+    enabled: isOpen && !!clearance?._id && !!clearance?.attachments?.length,
+  });
+
+  // Cleanup blob URLs when component unmounts or data changes
+  useEffect(() => {
+    return () => {
+      if (attachmentUrls) {
+        Object.values(attachmentUrls).forEach(url => {
+          if (url) URL.revokeObjectURL(url);
+        });
+      }
+    };
+  }, [attachmentUrls]);
 
   // Update form data when clearance data is loaded
   useEffect(() => {
@@ -429,6 +492,56 @@ const ClearanceDetailsModal = ({ isOpen, onClose, clearanceId }) => {
                     <p className="font-medium">
                       {clearance.payment?.transaction_id || "Not available"}
                     </p>
+                  )}
+                </div>
+
+                {/* Payment Proof Attachments */}
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500 mb-2 flex items-center gap-2">
+                    <ImageIcon size={16} />
+                    Payment Proof
+                  </p>
+                  {clearance.attachments && clearance.attachments.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {clearance.attachments.map((att, idx) => {
+                        const isImage = att.mimetype ? att.mimetype.startsWith('image/') : false;
+                        const attachmentUrl = attachmentUrls?.[idx];
+                        
+                        return (
+                          <a 
+                            key={idx} 
+                            href={attachmentUrl || '#'} 
+                            download={!isImage}
+                            target={isImage ? '_blank' : undefined}
+                            rel="noopener noreferrer" 
+                            className={`group block border border-gray-200 rounded-lg overflow-hidden transition-shadow ${attachmentUrl ? 'hover:shadow-md cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+                            style={{ minHeight: isImage ? 150 : 80 }}
+                          >
+                            {isImage && attachmentUrl ? (
+                              <img 
+                                src={attachmentUrl} 
+                                alt={att.filename || 'Payment Proof'}
+                                className="w-full h-full object-cover" 
+                                onError={(e) => {
+                                  console.error('Image failed to load:', att.filename);
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-full flex flex-col items-center justify-center p-3 text-center bg-gray-50 group-hover:bg-gray-100 transition-colors">
+                                <FileText size={24} className="text-indigo-500 mb-1" />
+                                <span className="text-xs text-gray-700 font-medium truncate w-full px-1">
+                                  {att.filename || 'File Attachment'}
+                                </span>
+                                {!attachmentUrl && <span className="text-xs text-red-500 mt-1">Failed to load</span>}
+                              </div>
+                            )}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm italic">No payment proof uploaded</p>
                   )}
                 </div>
               </div>
