@@ -25,14 +25,74 @@ const ViewBlotterModal = ({ isOpen, onClose, blotter, onEdit }) => {
     enabled: isOpen && !!blotter?.assigned_Officer?._id,
   });
 
-  // Cleanup blob URL when component unmounts
+  // FIXED: Fetch blotter attachments as blob URLs
+  const { data: blotterAttachmentUrls } = useQuery({
+    queryKey: ['blotterAttachments', blotter?._id],
+    queryFn: async () => {
+      if (!blotter?._id || !blotter?.attachments || blotter.attachments.length === 0) return {};
+      
+      const urls = {};
+      const token = localStorage.getItem('authToken');
+      
+      // Get the base URL from your api instance or construct it
+      const baseURL = api.defaults?.baseURL || 'http://localhost:3000/api';
+      
+      console.log('Fetching blotter attachments for:', blotter._id);
+      console.log('Total attachments:', blotter.attachments.length);
+      
+      try {
+        for (let i = 0; i < blotter.attachments.length; i++) {
+          try {
+            const url = `${baseURL}/blotters/${blotter._id}/attachments/${i}`;
+            console.log(`Fetching attachment ${i} from:`, url);
+            
+            const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+            
+            console.log(`Attachment ${i} response status:`, response.status);
+            
+            if (!response.ok) {
+              console.error(`Failed to fetch attachment ${i}: ${response.status} ${response.statusText}`);
+              urls[i] = null;
+              continue;
+            }
+            
+            const blob = await response.blob();
+            console.log(`Attachment ${i} blob size:`, blob.size, 'type:', blob.type);
+            urls[i] = URL.createObjectURL(blob);
+            console.log(`Created object URL for attachment ${i}:`, urls[i]);
+          } catch (error) {
+            console.error(`Error fetching attachment ${i}:`, error);
+            urls[i] = null;
+          }
+        }
+        console.log('Final attachment URLs:', urls);
+        return urls;
+      } catch (error) {
+        console.error('Failed to fetch blotter attachments:', error);
+        return {};
+      }
+    },
+    enabled: isOpen && !!blotter?._id && !!blotter?.attachments?.length,
+  });
+
+  // Cleanup blob URLs when component unmounts or data changes
   React.useEffect(() => {
     return () => {
       if (officerProfilePicUrl) {
         URL.revokeObjectURL(officerProfilePicUrl);
       }
+      if (blotterAttachmentUrls) {
+        Object.values(blotterAttachmentUrls).forEach(url => {
+          if (url) URL.revokeObjectURL(url);
+        });
+      }
     };
-  }, [officerProfilePicUrl]);
+  }, [officerProfilePicUrl, blotterAttachmentUrls]);
 
   const deleteBlotter = async () => {
     const response = await api.delete(`blotters/delete/${blotter._id}`);
@@ -188,13 +248,46 @@ const ViewBlotterModal = ({ isOpen, onClose, blotter, onEdit }) => {
           <div className="bg-white border border-gray-100 rounded-lg p-4 space-y-3">
             <p className="text-sm text-gray-500 mb-2">Attachments</p>
             {blotter.attachments && blotter.attachments.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                {blotter.attachments.map((att, idx) => (
-                  <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-purple-600 hover:underline">
-                    <FileText size={16} />
-                    <span>{att.name || att.type || "Attachment"}</span>
-                  </a>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {blotter.attachments.map((att, idx) => {
+                  // Check if it's an image based on mimetype
+                  const isImage = att.mimetype ? att.mimetype.startsWith('image/') : false;
+                  
+                  // Use the fetched blob URL from the query
+                  const attachmentUrl = blotterAttachmentUrls?.[idx];
+                  
+                  return (
+                    <a 
+                      key={idx} 
+                      href={attachmentUrl || '#'} 
+                      download={!isImage}
+                      target={isImage ? '_blank' : undefined}
+                      rel="noopener noreferrer" 
+                      className={`group block border border-gray-200 rounded-lg overflow-hidden transition-shadow ${attachmentUrl ? 'hover:shadow-md cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+                      style={{ minHeight: isImage ? 150 : 80 }}
+                    >
+                      {isImage && attachmentUrl ? (
+                        // Image Preview
+                        <img 
+                          src={attachmentUrl} 
+                          alt={att.filename || 'Attachment'}
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            console.error('Image failed to load:', att.filename);
+                            e.target.src = ''; // Hide image if it fails to load
+                          }}
+                        />
+                      ) : (
+                        // File Download/Link (for PDF, Word, etc.)
+                        <div className="h-full flex flex-col items-center justify-center p-3 text-center bg-gray-50 group-hover:bg-gray-100 transition-colors">
+                          <FileText size={24} className="text-purple-500 mb-1" />
+                          <span className="text-xs text-gray-700 font-medium truncate w-full px-1">{att.filename || 'File Attachment'}</span>
+                          {!attachmentUrl && <span className="text-xs text-red-500 mt-1">Failed to load</span>}
+                        </div>
+                      )}
+                    </a>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-gray-400">No attachments</p>
