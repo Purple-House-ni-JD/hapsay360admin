@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React from "react";
-import { X, UserPlus, Send } from "lucide-react";
+import { X, UserPlus, Send, Shield } from "lucide-react";
 import api from "../utils/api";
 
 const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
@@ -14,71 +14,112 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 		role: "",
 		station_id: "",
 		mobile_number: "",
+		password: "",
+		is_admin: false,
 	});
 
-	const [ isAddPersonnelSuccess, setIsAddPersonnelSuccess ] = useState(false);
-
-	const addPersonnel = async (payload) => {
-		const response = await api.post("officers/create", payload);
-		const data = await response.json();
-		console.log(data);
-
-		if (response.ok) {
-			alert("Personnel added successfully!");
-			setForm({
-				first_name: "",
-				last_name: "",
-				email: "",
-				role: "",
-				station_id: "",
-				mobile_number: "",
-			});
-		} else {
-			alert(data.message || "Unable to add personnel.");
-		}
+	const resetForm = () => {
+		setForm({
+			first_name: "",
+			last_name: "",
+			email: "",
+			role: "",
+			station_id: "",
+			mobile_number: "",
+			password: "",
+			is_admin: false,
+		});
 	};
 
-	const { mutate: addPersonnelMutation, isLoading, isError, error } = useMutation({
+	const addPersonnel = async (payload) => {
+		const endpoint = "officers/create";
+		const response = await api.post(endpoint, payload);
+		
+		if (!response.ok) {
+			const data = await response.json();
+			throw new Error(data.message || "Unable to add personnel.");
+		}
+		
+		return await response.json();
+	};
+
+	const { mutate: addPersonnelMutation, isLoading } = useMutation({
 		mutationFn: addPersonnel,
 		onSuccess: (data) => {
 			console.log("Personnel added:", data);
 			queryClient.invalidateQueries(["officers"]);
-			setForm({
-				first_name: "",
-				last_name: "",
-				email: "",
-				role: "",
-				station_id: "",
-				mobile_number: "",
-			});
-			setIsAddPersonnelSuccess(true);
+			
+			alert(form.is_admin ? "Admin created successfully!" : "Personnel added successfully!");
+			resetForm();
+			onClose();
 		},
-		onError: (data) => {
-			console.error("Error adding personnel", data.error);
+		onError: (error) => {
+			console.error("Error adding personnel:", error);
+			alert(error.message || "Unable to add personnel.");
 		},
 	});
 
 	const handleChange = (e) => {
-		const { name, value } = e.target;
+		const { name, value, type, checked } = e.target;
 		setForm((prevForm) => ({
 			...prevForm,
-			[name]: value,
+			[name]: type === 'checkbox' ? checked : value,
 		}));
 	};
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
-		addPersonnelMutation(form);
-		onClose();
+		
+		// Validation
+		if (form.is_admin && (!form.password || form.password.length < 6)) {
+			alert("Password must be at least 6 characters for admin accounts.");
+			return;
+		}
+		
+		if (!form.is_admin && !form.station_id) {
+			alert("Please select a station for officer accounts.");
+			return;
+		}
+		
+		const payload = {
+			first_name: form.first_name,
+			last_name: form.last_name,
+			email: form.email,
+			role: form.role || (form.is_admin ? "ADMIN" : "OFFICER"),
+			mobile_number: form.mobile_number,
+			is_admin: form.is_admin,
+		};
+		
+		if (!form.is_admin) {
+			payload.station_id = form.station_id;
+		} else if (form.station_id) {
+			payload.station_id = form.station_id;
+		}
+		
+		if (form.is_admin) {
+			payload.password = form.password;
+		} else if (form.password) {
+			payload.password = form.password;
+		}
+		
+		console.log("Submitting payload:", payload);
+		addPersonnelMutation(payload);
+	};
+
+	const handleClose = () => {
+		if (!isLoading) {
+			resetForm();
+			onClose();
+		}
 	};
 
 	if (!isOpen) {
-    return null;
-  }
+		return null;
+	}
 
 	return (
 		// Modal Overlay
-		<div className="fixed inset-0 bg-opacity-80 backdrop-blur-sm flex justify-center items-center z-50">
+		<div className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
 			{/* Modal Content */}
 			<div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transform transition-all duration-300 scale-100 opacity-100">
 				
@@ -87,23 +128,38 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 					<h3 className="text-2xl font-semibold text-indigo-700 flex items-center gap-2">
 						<UserPlus size={24} /> Add New Personnel
 					</h3>
-					<button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+					<button 
+						onClick={handleClose} 
+						className="text-gray-400 hover:text-gray-600 transition-colors"
+						disabled={isLoading}
+					>
 						<X size={24} />
 					</button>
 				</div>
 
-				{/* Success/Error Messages */}
-				{isAddPersonnelSuccess && (
-					<div className="mb-4 text-green-700 bg-green-50 border border-green-100 px-3 py-2 rounded">
-						Personnel added successfully.
-					</div>
-				)}
-
-				{isError && (
-					<div className="mb-4 text-red-700 bg-red-50 border border-red-100 px-3 py-2 rounded">
-						{(error && error.message) || "Unable to add personnel."}
-					</div>
-				)}
+				{/* Admin Toggle */}
+				<div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+					<label className="flex items-center gap-3 cursor-pointer">
+						<input
+							type="checkbox"
+							name="is_admin"
+							checked={form.is_admin}
+							onChange={handleChange}
+							disabled={isLoading}
+							className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+						/>
+						<div className="flex items-center gap-2">
+							<Shield size={20} className="text-blue-600" />
+							<span className="font-medium text-blue-800">Create as Admin User</span>
+						</div>
+					</label>
+					<p className="text-sm text-blue-600 mt-2 ml-7">
+						{form.is_admin 
+							? "This user will have full administrative privileges. A password is required."
+							: "This user will be a regular officer. Password will be auto-generated if not provided."
+						}
+					</p>
+				</div>
 
 				{/* Form */}
 				<form onSubmit={handleSubmit}>
@@ -121,7 +177,8 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 								onChange={handleChange}
 								placeholder="e.g. Juan"
 								required
-								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+								disabled={isLoading}
+								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
 							/>
 						</div>
 						<div>
@@ -136,7 +193,8 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 								onChange={handleChange}
 								placeholder="e.g. Dela Cruz"
 								required
-								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+								disabled={isLoading}
+								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
 							/>
 						</div>
 					</div>
@@ -153,9 +211,10 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 								name="role"
 								value={form.role}
 								onChange={handleChange}
-								placeholder="e.g. Police Major"
+								placeholder={form.is_admin ? "e.g. System Administrator" : "e.g. Police Major"}
 								required
-								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+								disabled={isLoading}
+								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
 							/>
 						</div>
 						<div>
@@ -169,14 +228,15 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 								value={form.mobile_number}
 								onChange={handleChange}
 								placeholder="e.g. 09123456789"
-								required
-								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+								required={!form.is_admin}
+								disabled={isLoading}
+								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
 							/>
 						</div>
 					</div>
 
 					{/* Email & Station Row */}
-					<div className="grid grid-cols-2 gap-4 mb-6">
+					<div className="grid grid-cols-2 gap-4 mb-4">
 						<div>
 							<label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
 								Email
@@ -189,22 +249,24 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 								onChange={handleChange}
 								placeholder="email@example.com"
 								required
-								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+								disabled={isLoading}
+								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
 							/>
 						</div>
 						<div>
 							<label htmlFor="station_id" className="block text-sm font-medium text-gray-700 mb-1">
-								Station Assigned
+								Station Assigned {!form.is_admin && <span className="text-red-500">*</span>}
 							</label>
 							<select
 								id="station_id"
 								name="station_id"
 								value={form.station_id}
 								onChange={handleChange}
-								required
-								className="w-full border border-gray-300 rounded-lg p-3 bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+								required={!form.is_admin}
+								disabled={isLoading}
+								className="w-full border border-gray-300 rounded-lg p-3 bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
 							>
-								<option value="" disabled>Select a Station</option>
+								<option value="">Select a Station</option>
 								{stations.map((station) => (
 									<option key={station._id} value={station._id}>
 										{station.name}
@@ -214,21 +276,54 @@ const AddPersonnelForm = ({ isOpen, onClose, stations = [] }) => {
 						</div>
 					</div>
 
+					{/* Password Row */}
+					{form.is_admin && (
+						<div className="mb-4">
+							<label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+								Password <span className="text-red-500">*</span>
+							</label>
+							<input
+								type="password"
+								id="password"
+								name="password"
+								value={form.password}
+								onChange={handleChange}
+								placeholder="Minimum 6 characters"
+								required
+								minLength={6}
+								disabled={isLoading}
+								className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 disabled:bg-gray-100"
+							/>
+							<p className="text-xs text-gray-500 mt-1">
+								Password is required for admin accounts.
+							</p>
+						</div>
+					)}
+
 					{/* Action Buttons */}
 					<div className="flex justify-end gap-3 pt-4 border-t">
 						<button
 							type="button"
-							onClick={onClose}
-							className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm"
+							onClick={handleClose}
+							disabled={isLoading}
+							className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
 						>
 							Cancel
 						</button>
 						<button
 							type="submit"
 							disabled={isLoading}
-							className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors shadow-md hover:shadow-lg disabled:opacity-60"
+							className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed ${
+								form.is_admin 
+									? 'bg-purple-600 hover:bg-purple-700 text-white'
+									: 'bg-indigo-600 hover:bg-indigo-700 text-white'
+							}`}
 						>
-							<Send size={18} /> {isLoading ? "Adding..." : "Add Personnel"}
+							<Send size={18} /> 
+							{isLoading 
+								? (form.is_admin ? "Creating Admin..." : "Adding...") 
+								: (form.is_admin ? "Create Admin" : "Add Personnel")
+							}
 						</button>
 					</div>
 				</form>
