@@ -5,7 +5,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import api from "../utils/api";
 
-// Fix Leaflet marker icons OUTSIDE component - runs once when module loads
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -15,7 +14,6 @@ L.Icon.Default.mergeOptions({
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-// --- OpenStreetMap Picker Component ---
 const GoogleMapPicker = ({ initialPosition, onLocationSelect }) => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -58,7 +56,6 @@ const GoogleMapPicker = ({ initialPosition, onLocationSelect }) => {
       });
     }
 
-    // Cleanup on unmount
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
@@ -79,7 +76,6 @@ const GoogleMapPicker = ({ initialPosition, onLocationSelect }) => {
   );
 };
 
-// --- EditStationModal Component ---
 const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
   const queryClient = useQueryClient();
 
@@ -108,7 +104,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
     return data;
   };
 
-  // API function using the correct endpoint
 
   const { mutate: updateStationMutation, isLoading: isSubmitting, isError, error: mutationError } = useMutation({
     mutationFn: updateStation,
@@ -116,7 +111,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
       console.log("Station updated successfully", data);
       queryClient.invalidateQueries({ queryKey: ["stations"] });
       setIsEditStationSuccess(true);
-      // Reset form
       setFormData({
         name: "",
         address: "",
@@ -155,7 +149,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
     e.preventDefault();
     setError(null);
 
-    // Frontend Validation
     const requiredFields = {
       name: formData.name,
       address: formData.address,
@@ -188,7 +181,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
       return;
     }
 
-    // Submit the form
     updateStationMutation(formData);
   };
 
@@ -208,7 +200,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
         }
       : null;
 
-  // Return null AFTER all hooks have been called
   if (!isOpen) return null;
 
   return (
@@ -228,7 +219,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
           </button>
         </div>
 
-        {/* Success Message */}
         {isEditStationSuccess && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
             <CheckCircle className="text-green-500" size={20} />
@@ -240,7 +230,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
           </div>
         )}
 
-        {/* Error Message */}
         {(error || isError) && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
             <AlertTriangle size={20} />
@@ -260,7 +249,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
                 Station Details
               </h4>
 
-              {/* Name (Required) */}
               <div>
                 <label
                   htmlFor="name"
@@ -280,7 +268,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
                 />
               </div>
 
-              {/* Address (Required) */}
               <div>
                 <label
                   htmlFor="address"
@@ -301,7 +288,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Phone Number (Required) */}
                 <div>
                   <label
                     htmlFor="phone_number"
@@ -321,7 +307,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
                   />
                 </div>
 
-                {/* Landline (Required) */}
                 <div>
                   <label
                     htmlFor="landline"
@@ -342,7 +327,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
                 </div>
               </div>
 
-              {/* Email (Optional) */}
               <div>
                 <label
                   htmlFor="email"
@@ -361,7 +345,6 @@ const EditStationModal = ({ isOpen, onClose, selectedStation}) => {
                 />
               </div>
 
-              {/* Coordinates Display */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">

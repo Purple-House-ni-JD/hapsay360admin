@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { UserCircle, Edit2, Camera, X } from "lucide-react";
+import { UserCircle, Edit2, Camera, X, Lock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "../Components/Sidebar";
 import AdminHeader from "../Components/AdminHeader";
@@ -31,6 +31,13 @@ const updateOfficerProfile = async (profileData) => {
   return data;
 };
 
+const changePassword = async (passwordData) => {
+  const response = await api.put("/officers/profile/password", passwordData);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Unable to change password");
+  return data;
+};
+
 const ProfilePage = () => {
   const queryClient = useQueryClient();
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -39,12 +46,17 @@ const ProfilePage = () => {
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     email: "",
     mobile_number: "",
-    radio_id: "",
+  });
+  const [passwordData, setPasswordData] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
   });
   const [profileImageData, setProfileImageData] = useState(null);
   const [removeProfilePicture, setRemoveProfilePicture] = useState(false);
@@ -72,7 +84,6 @@ const ProfilePage = () => {
         last_name: profile.last_name || "",
         email: profile.email || "",
         mobile_number: profile.contact?.mobile_number || "",
-        radio_id: profile.contact?.radio_id || "",
       });
     }
   }, [profile]);
@@ -137,9 +148,30 @@ const ProfilePage = () => {
     },
   });
 
+  const { mutate: updatePassword, isLoading: isUpdatingPassword } = useMutation({
+    mutationFn: changePassword,
+    onSuccess: () => {
+      alert("Password changed successfully");
+      setIsChangingPassword(false);
+      setPasswordData({
+        current_password: "",
+        new_password: "",
+        confirm_password: "",
+      });
+    },
+    onError: (error) => {
+      alert("Failed to change password: " + error.message);
+    },
+  });
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleProfileImageChange = (e) => {
@@ -172,6 +204,25 @@ const ProfilePage = () => {
     updateProfile(formData);
   };
 
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      alert("New passwords do not match");
+      return;
+    }
+
+    if (passwordData.new_password.length < 6) {
+      alert("New password must be at least 6 characters long");
+      return;
+    }
+
+    updatePassword({
+      current_password: passwordData.current_password,
+      new_password: passwordData.new_password,
+    });
+  };
+
   const handleCancel = () => {
     setIsEditing(false);
     setProfileImageData(null);
@@ -182,9 +233,17 @@ const ProfilePage = () => {
         last_name: profile.last_name || "",
         email: profile.email || "",
         mobile_number: profile.contact?.mobile_number || "",
-        radio_id: profile.contact?.radio_id || "",
       });
     }
+  };
+
+  const handleCancelPasswordChange = () => {
+    setIsChangingPassword(false);
+    setPasswordData({
+      current_password: "",
+      new_password: "",
+      confirm_password: "",
+    });
   };
 
   const handleLogout = () => {
@@ -286,7 +345,7 @@ const ProfilePage = () => {
           This section is for managing the Admin's personal details, password, and security settings.
         </p>
 
-        <div className="bg-white p-8 rounded-xl shadow-lg">
+        <div className="bg-white p-8 rounded-xl shadow-lg mb-6">
           <div className="flex flex-col md:flex-row gap-8">
             {/* Profile Picture */}
             <div className="flex flex-col items-center">
@@ -361,9 +420,6 @@ const ProfilePage = () => {
                       Phone no: {profile?.contact?.mobile_number || "Not provided"}
                     </p>
                     <p className="text-sm text-gray-500">Email: {profile?.email || "Not provided"}</p>
-                    <p className="text-sm text-gray-500">
-                      Radio ID: {profile?.contact?.radio_id || "Not provided"}
-                    </p>
                   </div>
                 </div>
               ) : (
@@ -428,19 +484,6 @@ const ProfilePage = () => {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Radio ID
-                      </label>
-                      <input
-                        type="text"
-                        name="radio_id"
-                        value={formData.radio_id}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    </div>
                   </div>
 
                   <div className="flex gap-4 mt-6">
@@ -470,6 +513,96 @@ const ProfilePage = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Change Password Section */}
+        <div className="bg-white p-8 rounded-xl shadow-lg">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold text-[#4f52e8]">Security</h3>
+            {!isChangingPassword && (
+              <button
+                onClick={() => setIsChangingPassword(true)}
+                className="flex items-center gap-2 text-[#4f52e8] hover:text-[#3e40c0] font-medium"
+              >
+                <Lock size={16} />
+                Change Password
+              </button>
+            )}
+          </div>
+
+          {isChangingPassword ? (
+            <form onSubmit={handlePasswordSubmit} className="bg-gray-50 rounded-lg p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    name="current_password"
+                    value={passwordData.current_password}
+                    onChange={handlePasswordChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    name="new_password"
+                    value={passwordData.new_password}
+                    onChange={handlePasswordChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                    minLength={6}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Password must be at least 6 characters long
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    name="confirm_password"
+                    value={passwordData.confirm_password}
+                    onChange={handlePasswordChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4 mt-6">
+                <button
+                  type="submit"
+                  disabled={isUpdatingPassword}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50"
+                >
+                  {isUpdatingPassword ? "Changing..." : "Change Password"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelPasswordChange}
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-2 rounded-lg font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Keep your account secure by using a strong password and changing it regularly.
+            </p>
+          )}
         </div>
       </main>
     </div>

@@ -1,73 +1,41 @@
 import React, { useState } from "react";
-import { Mail, Lock, User } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function AuthPortal() {
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
   const apiBaseUrl = baseUrl?.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  const initialFormState = {
-    first_name: "",
-    last_name: "",
-    email: "",
-    password: "",
-  };
-
+  
   const navigate = useNavigate();
 
-  const capitalizeString = (s = "") => {
-    const str = String(s).trim();
-    if (!str) return "";
-    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-  };
-
   async function login(payload) {
-    const response = await fetch(`${apiBaseUrl}auth/admin/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    console.log(data);
-    if (response.ok) {
-      localStorage.setItem("token", data.token);
-      navigate("/AdminDashboard");
-    } else {
-      alert(data.message);
+    try {
+      const response = await fetch(`${apiBaseUrl}auth/admin/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        localStorage.setItem("token", data.token);
+        navigate("/AdminDashboard");
+      } else {
+        alert(data.message || "Login failed. Please check your credentials.");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("An error occurred during login. Please try again.");
     }
   }
 
-  async function signup(payload) {
-    const response = await fetch(`${apiBaseUrl}auth/admin/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    console.log(data);
-    if (response.ok) {
-      alert("Account created! You can now sign in.");
-      setIsLogin(true);
-      setFormData(initialFormState);
-    } else {
-      alert(data.message || "Unable to create account.");
-    }
-  }
-
-  // async function forgotPassword() {
-  //   const response = await fetch(`${baseUrl}auth/admin/forgot-password`, {
-  //     method: "POST",
-  //     body: JSON.stringify(formData),
-  //   });
-  //   const data = await response.json();
-  //   console.log(data);
-  // }
-
-  const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState(initialFormState);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
   const handleChange = (e) => {
     setFormData({
@@ -78,26 +46,11 @@ export default function AuthPortal() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (isLogin) {
-      await login({
-        email: formData.email.trim(),
-        password: formData.password,
-      });
-      return;
-    }
-
-    await signup({
-      first_name: capitalizeString(formData.first_name),
-      last_name: capitalizeString(formData.last_name),
+    
+    await login({
       email: formData.email.trim(),
       password: formData.password,
     });
-  };
-
-  const toggleAuthMode = () => {
-    setIsLogin((prev) => !prev);
-    setFormData(initialFormState);
   };
 
   return (
@@ -117,6 +70,7 @@ export default function AuthPortal() {
         <h1 className="text-7xl font-semibold tracking-wide drop-shadow-lg">
           HAPSAY<span className="text-6xl">360</span>
         </h1>
+        <p className="text-xl mt-4 text-gray-300">Admin Portal</p>
       </div>
 
       {/* Right Side */}
@@ -126,51 +80,11 @@ export default function AuthPortal() {
       >
         <div className="w-full max-w-md">
           <h2 className="text-3xl font-semibold text-gray-800 mb-6">
-            {isLogin ? "Sign in to your account" : "Sign Up"}
+            Admin Sign In
           </h2>
 
           <div className="flex flex-col gap-5">
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              {/* First & Last Name (Sign Up only) */}
-              {!isLogin && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      First Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        name="first_name"
-                        value={formData.first_name}
-                        required={!isLogin}
-                        onChange={handleChange}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition shadow-sm"
-                        placeholder="Enter your first name"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Last Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        name="last_name"
-                        value={formData.last_name}
-                        required={!isLogin}
-                        onChange={handleChange}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition shadow-sm"
-                        placeholder="Enter your last name"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
               {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -185,26 +99,24 @@ export default function AuthPortal() {
                     required
                     onChange={handleChange}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition shadow-sm"
-                    placeholder="Enter your email"
+                    placeholder="Enter admin email"
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div className={`${isLogin ? "mt-6" : ""}`}>
+              <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="block text-sm font-medium text-gray-700">
                     Password
                   </label>
-                  {isLogin && (
-                    <button
-                      type="button"
-                      onClick={() => navigate("/ForgotPassword")}
-                      className="text-sm text-[#0D6EFD] hover:text-indigo-700"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => navigate("/ForgotPassword")}
+                    className="text-sm text-[#0D6EFD] hover:text-indigo-700"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -215,7 +127,7 @@ export default function AuthPortal() {
                     required
                     onChange={handleChange}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition shadow-sm"
-                    placeholder="Enter your password"
+                    placeholder="Enter admin password"
                   />
                 </div>
               </div>
@@ -223,22 +135,17 @@ export default function AuthPortal() {
               {/* Submit */}
               <button
                 type="submit"
-                className="w-full bg-indigo-800 hover:bg-indigo-900 text-white font-medium py-3 rounded-md transition duration-200 shadow-md hover:shadow-lg"
+                className="w-full bg-indigo-800 hover:bg-indigo-900 text-white font-medium py-3 rounded-md transition duration-200 shadow-md hover:shadow-lg mt-2"
               >
-                {isLogin ? "Sign in" : "Sign up"}
+                Sign in
               </button>
 
-              {/* Toggle */}
-              <p className="text-xl text-gray-600 text-center pt-4">
-                {isLogin ? "No account yet? " : "Already have an account? "}
-                <button
-                  type="button"
-                  onClick={toggleAuthMode}
-                  className="text-[#0D6EFD] hover:text-indigo-700 font-medium"
-                >
-                  {isLogin ? "Create Now" : "Sign in"}
-                </button>
-              </p>
+              {/* Admin Access Note */}
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-800 text-center">
+                  <strong>Restricted Access:</strong> This portal is for authorized administrators only.
+                </p>
+              </div>
             </form>
           </div>
         </div>
