@@ -217,7 +217,7 @@ const BlotterTable = () => {
           onClick={handleExport}
           className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg shadow font-medium transition-colors"
         >
-          Export blotter list
+          Export blotter list (CSV)
         </button>
       </div>
 
